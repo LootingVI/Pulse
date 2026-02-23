@@ -1,44 +1,18 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: uptime_monitor
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  app:
+  pulse:
     build: .
+    container_name: pulse
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - pulse_data:/app/prisma/data
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@db:5432/uptime_monitor?schema=public"
-      REDIS_URL: "redis://redis:6379"
-      NEXTAUTH_URL: "http://localhost:3000"
-      NEXTAUTH_SECRET: "your-secret-key"
-    depends_on:
-      - db
-      - redis
-
-  worker:
-    build: .
-    command: npm run start:worker
-    environment:
-      DATABASE_URL: "postgresql://postgres:postgres@db:5432/uptime_monitor?schema=public"
-      REDIS_URL: "redis://redis:6379"
-    depends_on:
-      - db
-      - redis
+      - DATABASE_URL=file:/app/prisma/data/pulse.db
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
 
 volumes:
-  postgres_data:
+  pulse_data:
