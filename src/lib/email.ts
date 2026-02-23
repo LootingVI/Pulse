@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { prisma } from "./db";
+import { decrypt } from "./encryption";
 
 // Helper to get transporter configured from DB
 export async function getTransporter() {
@@ -21,7 +22,7 @@ export async function getTransporter() {
         secure: parseInt(config.smtpPort) === 465,
         auth: config.smtpUser ? {
             user: config.smtpUser,
-            pass: config.smtpPass || "",
+            pass: config.smtpPass ? decrypt(config.smtpPass) : "",
         } : undefined,
     });
 }

@@ -7,6 +7,7 @@ import { performCheck } from "./monitor";
 import { sendDiscordNotification } from "./notifications";
 import { sendMonitorAlert } from "./email";
 import { handleCascadeDetection } from "./cascade";
+import { decrypt } from "./encryption";
 
 export function generateMockRCA(monitorType: string, message: string): string {
     const aiPrefix = "🤖 **AI Analysis:** Based on telemetric patterns, ";
@@ -147,7 +148,8 @@ async function runCheck(monitorId: string) {
         if (!cascadeResult.suppressed) {
             const discordWebhook = await prisma.setting.findUnique({ where: { key: "discordWebhook" } });
             if (discordWebhook?.value) {
-                await sendDiscordNotification(discordWebhook.value, "Monitor Down", monitor.name, "OFFLINE", result.responseTime).catch(() => { });
+                const webhookUrl = decrypt(discordWebhook.value);
+                await sendDiscordNotification(webhookUrl, "Monitor Down", monitor.name, "OFFLINE", result.responseTime).catch(() => { });
             }
 
             const notifyDown = await prisma.setting.findUnique({ where: { key: "notifyDown" } });
@@ -174,7 +176,8 @@ async function runCheck(monitorId: string) {
 
         const discordWebhook = await prisma.setting.findUnique({ where: { key: "discordWebhook" } });
         if (discordWebhook?.value) {
-            await sendDiscordNotification(discordWebhook.value, "Monitor Restored", monitor.name, "ONLINE", result.responseTime).catch(() => { });
+            const webhookUrl = decrypt(discordWebhook.value);
+            await sendDiscordNotification(webhookUrl, "Monitor Restored", monitor.name, "ONLINE", result.responseTime).catch(() => { });
         }
 
         const notifyUp = await prisma.setting.findUnique({ where: { key: "notifyUp" } });

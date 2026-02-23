@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { sendDiscordNotification } from "@/lib/notifications";
 import { sendMonitorAlert } from "@/lib/email";
 import { generateMockRCA } from "@/lib/scheduler";
+import { decrypt } from "@/lib/encryption";
 
 /**
  * Cascade / Dependency Detection for Pulse
@@ -106,8 +107,9 @@ export async function handleCascadeDetection(
             // Notify about the cascade (single notification)
             const discordWebhook = await db.setting.findUnique({ where: { key: "discordWebhook" } });
             if (discordWebhook?.value) {
+                const webhookUrl = decrypt(discordWebhook.value);
                 sendDiscordNotification(
-                    discordWebhook.value,
+                    webhookUrl,
                     "⚡ Mass Outage Detected",
                     `${uniqueMonitors.size} services offline simultaneously`,
                     "OFFLINE",
