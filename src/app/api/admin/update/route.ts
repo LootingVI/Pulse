@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { execSync } from "child_process";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 // ─── Public GitHub repo for Pulse ───────────────────────────────────────────
 const GITHUB_OWNER = "LootingVI";
@@ -22,7 +24,7 @@ function getLocalVersion(): string {
     } catch {
         // Fallback: read version from package.json if git is not available
         try {
-            const pkg = require(`${process.cwd()}/package.json`);
+            const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"));
             return pkg.version ?? "unknown";
         } catch {
             return "unknown";
