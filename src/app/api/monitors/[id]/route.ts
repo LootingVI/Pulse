@@ -61,6 +61,7 @@ export async function PATCH(
             customWebhook: data.customWebhook !== undefined ? data.customWebhook : existing.customWebhook,
             isPaused: data.isPaused !== undefined ? data.isPaused : existing.isPaused,
             regions: data.regions !== undefined ? data.regions : existing.regions,
+            tags: data.tags !== undefined ? data.tags : (existing as any).tags,
         },
     });
 

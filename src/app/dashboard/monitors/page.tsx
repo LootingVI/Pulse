@@ -68,6 +68,7 @@ interface Monitor {
     customWebhook: string | null;
     keyword: string | null;
     regions: string;
+    tags: string | null;
 }
 
 const MONITOR_TYPES = [
@@ -133,10 +134,13 @@ export default function MonitorsPage() {
         maxResponseTime: "",
         customWebhook: "",
         parentMonitorId: "",
+        tags: "",
     });
     const [monitorToDelete, setMonitorToDelete] = useState<{ id: string, name: string } | null>(null);
     const [editMonitor, setEditMonitor] = useState<Monitor | null>(null);
     const [heartbeatUrl, setHeartbeatUrl] = useState<string | null>(null);
+    const [selectedMonitorIds, setSelectedMonitorIds] = useState<Set<string>>(new Set());
+    const [tagFilter, setTagFilter] = useState("");
     const [editForm, setEditForm] = useState({
         name: "",
         target: "",
@@ -146,6 +150,7 @@ export default function MonitorsPage() {
         maxResponseTime: "",
         customWebhook: "",
         regions: "",
+        tags: "",
     });
     const [isEditSaving, setIsEditSaving] = useState(false);
 
@@ -199,6 +204,7 @@ export default function MonitorsPage() {
             if (newMonitor.maxResponseTime) payload.maxResponseTime = newMonitor.maxResponseTime;
             if (newMonitor.customWebhook) payload.customWebhook = newMonitor.customWebhook;
             if (newMonitor.parentMonitorId) payload.parentMonitorId = newMonitor.parentMonitorId;
+            if (newMonitor.tags) payload.tags = newMonitor.tags;
             payload.regions = selectedRegions.length > 0 ? selectedRegions.join(",") : "local";
 
             const res = await fetch("/api/monitors", {
@@ -211,7 +217,7 @@ export default function MonitorsPage() {
                 const created = await res.json();
                 toast.success("Monitor created and started!");
                 setIsDialogOpen(false);
-                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", parentMonitorId: "" });
+                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", parentMonitorId: "", tags: "" });
                 setSelectedType("HTTP");
                 // Show heartbeat URL if applicable
                 if (created.heartbeatToken) {
@@ -261,6 +267,7 @@ export default function MonitorsPage() {
                     maxResponseTime: monitor.maxResponseTime,
                     customWebhook: monitor.customWebhook,
                     regions: monitor.regions,
+                    tags: monitor.tags,
                 }),
             });
             if (res.ok) {
@@ -326,6 +333,7 @@ export default function MonitorsPage() {
             maxResponseTime: monitor.maxResponseTime ? String(monitor.maxResponseTime) : "",
             customWebhook: monitor.customWebhook || "",
             regions: monitor.regions || "",
+            tags: monitor.tags || "",
         });
     };
 
@@ -344,6 +352,7 @@ export default function MonitorsPage() {
             if (editForm.maxResponseTime) payload.maxResponseTime = editForm.maxResponseTime;
             if (editForm.customWebhook) payload.customWebhook = editForm.customWebhook;
             if (editForm.regions) payload.regions = editForm.regions;
+            payload.tags = editForm.tags;
 
             const res = await fetch(`/api/monitors/${editMonitor.id}`, {
                 method: "PATCH",
@@ -363,6 +372,28 @@ export default function MonitorsPage() {
             toast.error("An error occurred");
         } finally {
             setIsEditSaving(false);
+        }
+    };
+
+    const handleBulkAction = async (action: string, data?: any) => {
+        if (selectedMonitorIds.size === 0) return;
+        const monitorIds = Array.from(selectedMonitorIds);
+        try {
+            toast.loading(`Applying bulk action...`, { id: "bulk-action" });
+            const res = await fetch("/api/monitors/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, monitorIds, data }),
+            });
+            if (res.ok) {
+                toast.success(`Bulk action successful!`, { id: "bulk-action" });
+                setSelectedMonitorIds(new Set());
+                fetchMonitors();
+            } else {
+                toast.error(`Bulk action failed`, { id: "bulk-action" });
+            }
+        } catch {
+            toast.error("An error occurred", { id: "bulk-action" });
         }
     };
 
@@ -413,6 +444,29 @@ export default function MonitorsPage() {
     const showPort = ["PORT", "SMTP", "STEAM", "MINECRAFT"].includes(selectedType);
     const showKeyword = selectedType === "KEYWORD";
     const isHeartbeatType = selectedType === "HEARTBEAT";
+
+    const filteredMonitors = monitors.filter(m => {
+        if (!tagFilter) return true;
+        if (!m.tags) return false;
+        const searchTags = tagFilter.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+        const monitorTags = m.tags.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+        return searchTags.some(t => monitorTags.includes(t));
+    });
+
+    const toggleSelectAll = () => {
+        if (selectedMonitorIds.size === filteredMonitors.length && filteredMonitors.length > 0) {
+            setSelectedMonitorIds(new Set());
+        } else {
+            setSelectedMonitorIds(new Set(filteredMonitors.map(m => m.id)));
+        }
+    };
+
+    const toggleSelectMonitor = (id: string) => {
+        const next = new Set(selectedMonitorIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedMonitorIds(next);
+    };
 
     return (
         <div className="space-y-6">
@@ -604,6 +658,15 @@ export default function MonitorsPage() {
                                     </Select>
                                 </div>
 
+                                {/* Tags */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Tags <span className="text-xs text-muted-foreground ml-1">(comma-separated)</span></label>
+                                    <Input
+                                        placeholder="prod, frontend, api"
+                                        value={newMonitor.tags}
+                                        onChange={(e) => setNewMonitor({ ...newMonitor, tags: e.target.value })}
+                                    />
+                                </div>
 
                                 {/* Edge Node Regions */}
                                 {edgeNodes.length > 0 && (
@@ -674,10 +737,63 @@ export default function MonitorsPage() {
                 </div>
             </div>
 
+            <div className="flex items-center gap-2 mb-4">
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Filter by tags (comma separated)..."
+                        className="pl-8"
+                        value={tagFilter}
+                        onChange={(e) => setTagFilter(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {selectedMonitorIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-popover/90 backdrop-blur-md border border-border shadow-xl rounded-full px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-5">
+                    <span className="text-sm font-medium mr-2">
+                        {selectedMonitorIds.size} monitor{selectedMonitorIds.size > 1 ? "s" : ""} selected
+                    </span>
+                    <div className="h-4 w-px bg-border" />
+                    <Button size="sm" variant="ghost" className="h-8 rounded-full" onClick={() => handleBulkAction("PAUSE")}>
+                        Pause
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 rounded-full" onClick={() => handleBulkAction("RESUME")}>
+                        Resume
+                    </Button>
+                    <Select onValueChange={(val) => handleBulkAction("UPDATE_INTERVAL", { interval: val })}>
+                        <SelectTrigger className="w-[120px] h-8 rounded-full border-none bg-muted/50 focus:ring-0">
+                            <SelectValue placeholder="Interval" />
+                        </SelectTrigger>
+                        <SelectContent side="top">
+                            <SelectItem value="60">1m</SelectItem>
+                            <SelectItem value="300">5m</SelectItem>
+                            <SelectItem value="600">10m</SelectItem>
+                            <SelectItem value="1800">30m</SelectItem>
+                            <SelectItem value="3600">60m</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="destructive" className="h-8 rounded-full ml-2" onClick={() => handleBulkAction("DELETE")}>
+                        Delete
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-full" onClick={() => setSelectedMonitorIds(new Set())}>
+                        ✕
+                    </Button>
+                </div>
+            )}
+
             <div className="rounded-md border bg-card">
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead className="w-12 text-center">
+                                <input
+                                    type="checkbox"
+                                    className="accent-primary w-4 h-4 cursor-pointer"
+                                    checked={selectedMonitorIds.size === filteredMonitors.length && filteredMonitors.length > 0}
+                                    onChange={toggleSelectAll}
+                                />
+                            </TableHead>
                             <TableHead className="w-24">Status</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead className="w-28">Type</TableHead>
@@ -690,21 +806,40 @@ export default function MonitorsPage() {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                                     Loading monitors…
                                 </TableCell>
                             </TableRow>
-                        ) : monitors.length === 0 ? (
+                        ) : filteredMonitors.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                                     No monitors yet — add your first one!
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            monitors.map((monitor) => (
+                            filteredMonitors.map((monitor) => (
                                 <TableRow key={monitor.id} className={monitor.isPaused ? "opacity-60" : ""}>
+                                    <TableCell className="text-center">
+                                        <input
+                                            type="checkbox"
+                                            className="accent-primary w-4 h-4 cursor-pointer"
+                                            checked={selectedMonitorIds.has(monitor.id)}
+                                            onChange={() => toggleSelectMonitor(monitor.id)}
+                                        />
+                                    </TableCell>
                                     <TableCell>{getStatusBadge(monitor)}</TableCell>
-                                    <TableCell className="font-medium">{monitor.name}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {monitor.name}
+                                        {monitor.tags && (
+                                            <div className="flex gap-1 mt-1 flex-wrap">
+                                                {monitor.tags.split(",").map((t, idx) => (
+                                                    <span key={idx} className="text-[10px] bg-muted/50 border px-1.5 py-0.5 rounded-sm text-muted-foreground">
+                                                        {t.trim()}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                                             {getTypeIcon(monitor.type)}
@@ -865,6 +1000,10 @@ export default function MonitorsPage() {
                             )}
                         </div>
                         <div className="space-y-2">
+                            <label className="text-sm font-medium">Tags <span className="text-xs text-muted-foreground ml-1">(comma-separated)</span></label>
+                            <Input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="prod, backend" />
+                        </div>
+                        <div className="space-y-2">
                             <label className="text-sm font-medium">Check Interval</label>
                             <Select value={editForm.interval} onValueChange={(val) => setEditForm({ ...editForm, interval: val })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -883,9 +1022,9 @@ export default function MonitorsPage() {
                                 {isEditSaving ? "Saving..." : "Save Changes"}
                             </Button>
                         </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-        </div>
+                    </form >
+                </DialogContent >
+            </Dialog >
+        </div >
     );
 }
