@@ -73,7 +73,7 @@ Visit **http://localhost:3000** and register your first account.
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/pulse.git
+git clone https://github.com/LootingVI/pulse.git
 cd pulse
 npm install
 
