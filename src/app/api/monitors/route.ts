@@ -1,0 +1,58 @@
+import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { NextResponse } from "next/server";
+import { startMonitor } from "@/lib/scheduler";
+
+export async function GET() {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const userId = (session.user as any).id;
+    const monitors = await prisma.monitor.findMany({
+        where: { userId },
+        include: { group: true },
+        orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json(monitors);
+}
+
+export async function POST(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const userId = (session.user as any).id;
+    const data = await req.json();
+
+    try {
+        const monitor = await prisma.monitor.create({
+            data: {
+                name: data.name,
+                type: data.type,
+                target: data.target,
+                port: data.port ? parseInt(data.port) : null,
+                keyword: data.keyword || null,
+                interval: parseInt(data.interval) || 300,
+                timeout: data.timeout ? parseInt(data.timeout) : 30,
+                retries: data.retries ? parseInt(data.retries) : 3,
+                maxResponseTime: data.maxResponseTime ? parseInt(data.maxResponseTime) : null,
+                customWebhook: data.customWebhook || null,
+                isPaused: data.isPaused || false,
+                regions: data.regions || "eu-central",
+                userId,
+                groupId: data.groupId || null,
+            },
+        });
+
+        // Start monitoring immediately if not paused
+        if (!monitor.isPaused) {
+            startMonitor(monitor.id, monitor.interval);
+        }
+
+        return NextResponse.json(monitor);
+    } catch (error) {
+        console.error("Failed to create monitor:", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}

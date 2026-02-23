@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum MonitorType {
+  HTTP
+  PING
+  PORT
+  KEYWORD
+  MINECRAFT
+  DISCORD
+  DNS
+  SSL
+  SMTP
+  STEAM
+}
+
+enum MonitorStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  monitors      Monitor[]
+  groups        Group[]
+  statusPages   StatusPage[]
+}
+
+model Group {
+  id        String    @id @default(cuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitors  Monitor[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Monitor {
+  id              String        @id @default(cuid())
+  name            String
+  type            MonitorType   @default(HTTP)
+  target          String
+  port            Int?
+  keyword         String?
+  interval        Int           @default(300)
+  timeout         Int           @default(30)
+  retries         Int           @default(3)
+  status          MonitorStatus @default(ONLINE)
+  lastChecked     DateTime?
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId         String?
+  group           Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  results         CheckResult[]
+  incidents       Incident[]
+  statusPages     StatusPage[]  @relation("StatusPageMonitors")
+  
+  // New "Pulse Unique" Features
+  isPaused        Boolean       @default(false)
+  maxResponseTime Int?          // Expected SLA. Over this -> Warning incident
+  customWebhook   String?       // Pings this specific URL if it goes offline
+  regions         String?       @default("eu-central") // comma separated list like "eu-central,us-east,asia-south"
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model CheckResult {
+  id           String   @id @default(cuid())
+  monitorId    String
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status       MonitorStatus
+  responseTime Int
+  region       String   @default("eu-central")
+  timestamp    DateTime @default(now())
+
+  @@index([monitorId, timestamp])
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  monitorId   String
+  monitor     Monitor        @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      IncidentStatus @default(INVESTIGATING)
+  aiRCA       String?        // Mocked AI Root cause analysis
+  updates     IncidentUpdate[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+
+model IncidentUpdate {
+  id          String         @id @default(cuid())
+  incidentId  String
+  incident    Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  status      IncidentStatus
+  message     String
+  createdAt   DateTime       @default(now())
+}
+
+model StatusPage {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  description String?
+  logo        String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitors    Monitor[] @relation("StatusPageMonitors")
+  config      String?   
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
