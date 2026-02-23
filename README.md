@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/pulse-logo.svg" width="60" alt="Pulse Logo" />
+<img src="public/pulse-logo.png" width="60" alt="Pulse Logo" />
 
 # Pulse
 
@@ -18,24 +18,11 @@
 
 ## 📸 Screenshots
 
-<table>
-  <tr>
-    <td><img src="public/screenshots/dashboard.png" alt="Dashboard" /></td>
-    <td><img src="public/screenshots/monitors.png" alt="Monitors" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Dashboard Overview</b></td>
-    <td align="center"><b>Monitors List</b></td>
-  </tr>
-  <tr>
-    <td><img src="public/screenshots/analytics.png" alt="Analytics" /></td>
-    <td><img src="public/screenshots/status-pages.png" alt="Status Pages" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Monitor Analytics</b></td>
-    <td align="center"><b>Public Status Pages</b></td>
-  </tr>
-</table>
+| Dashboard Overview | Monitors List |
+| :---: | :---: |
+| ![Dashboard](public/screenshots/dashboard.png) | ![Monitors](public/screenshots/monitors.png) |
+| **Monitor Analytics** | **Public Status Pages** |
+| ![Analytics](public/screenshots/analytics.png) | ![Status Pages](public/screenshots/status-pages.png) |
 
 ---
 
