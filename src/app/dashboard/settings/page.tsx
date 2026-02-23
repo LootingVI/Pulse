@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Save, Bell, Webhook, Mail, Globe, Trash2, Plus } from "lucide-react";
+import { Save, Bell, Webhook, Mail, Globe, Trash2, Plus, GitFork } from "lucide-react";
 import { toast } from "sonner";
 
 interface EdgeNode {
@@ -29,6 +29,11 @@ export default function SettingsPage() {
     const [edgeNodes, setEdgeNodes] = useState<EdgeNode[]>([]);
     const [testingNode, setTestingNode] = useState<number | null>(null);
 
+    // Cascade Detection
+    const [cascadeEnabled, setCascadeEnabled] = useState(false);
+    const [cascadeThreshold, setCascadeThreshold] = useState("3");
+    const [cascadeWindow, setCascadeWindow] = useState("60");
+
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -48,6 +53,9 @@ export default function SettingsPage() {
                     setEdgeNodes(JSON.parse(data.edgeNodes));
                 } catch { }
             }
+            if (data.cascadeEnabled) setCascadeEnabled(data.cascadeEnabled === "true");
+            if (data.cascadeThreshold) setCascadeThreshold(data.cascadeThreshold);
+            if (data.cascadeWindow) setCascadeWindow(data.cascadeWindow);
         };
         fetchSettings();
     }, []);
@@ -68,6 +76,9 @@ export default function SettingsPage() {
                     smtpPass,
                     smtpFrom,
                     edgeNodes: JSON.stringify(edgeNodes.filter((n) => n.id && n.url)),
+                    cascadeEnabled: cascadeEnabled.toString(),
+                    cascadeThreshold,
+                    cascadeWindow,
                 }),
             });
             toast.success("Settings saved!");
@@ -198,6 +209,58 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
+            {/* ── Cascade / Dependency Detection ── */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <GitFork className="h-5 w-5" />
+                        Cascade Detection
+                    </CardTitle>
+                    <CardDescription>
+                        Automatically group simultaneous outages into a single incident and suppress duplicate alerts.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium">Enable Cascade Detection</p>
+                            <p className="text-xs text-muted-foreground">When multiple monitors fail at once, group them into one "Mass Outage" incident</p>
+                        </div>
+                        <Switch checked={cascadeEnabled} onCheckedChange={setCascadeEnabled} />
+                    </div>
+
+                    <div className={cascadeEnabled ? "space-y-4" : "space-y-4 opacity-40 pointer-events-none"}>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">Outage Threshold</label>
+                                <Input
+                                    type="number"
+                                    min="2"
+                                    max="50"
+                                    value={cascadeThreshold}
+                                    onChange={(e) => setCascadeThreshold(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">Min. monitors that must fail to trigger cascade grouping</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">Time Window (seconds)</label>
+                                <Input
+                                    type="number"
+                                    min="10"
+                                    max="600"
+                                    value={cascadeWindow}
+                                    onChange={(e) => setCascadeWindow(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">How wide the time window is to detect a simultaneous failure</p>
+                            </div>
+                        </div>
+                        <div className="rounded-md bg-muted/40 border p-3 text-xs text-muted-foreground">
+                            <p className="font-medium text-foreground mb-1">💡 Parent–Child Dependencies</p>
+                            <p>You can also assign a <strong>Parent Monitor</strong> to individual monitors (e.g. "Database" is the parent of "API Server"). If the parent goes OFFLINE, child alerts are automatically suppressed — configured per monitor in the Monitors page.</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">

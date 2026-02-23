@@ -6,8 +6,9 @@
 import { performCheck } from "./monitor";
 import { sendDiscordNotification } from "./notifications";
 import { sendMonitorAlert } from "./email";
+import { handleCascadeDetection } from "./cascade";
 
-function generateMockRCA(monitorType: string, message: string): string {
+export function generateMockRCA(monitorType: string, message: string): string {
     const aiPrefix = "🤖 **AI Analysis:** Based on telemetric patterns, ";
 
     if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
@@ -140,34 +141,29 @@ async function runCheck(monitorId: string) {
     if (previousStatus === "ONLINE" && result.status === "OFFLINE") {
         console.log(`[Scheduler] Monitor DOWN: ${monitor.name}`);
 
-        const aiRCA = generateMockRCA(monitor.type, result.message || "");
+        // Cascade / Dependency Detection handles incident creation + notification suppression
+        const cascadeResult = await handleCascadeDetection(monitor, result, prisma);
 
-        await prisma.incident.create({
-            data: {
-                monitorId,
-                title: `Service Down: ${monitor.name}`,
-                description: result.message || "The service is unreachable.",
-                status: "INVESTIGATING",
-                aiRCA,
-            },
-        });
+        if (!cascadeResult.suppressed) {
+            const discordWebhook = await prisma.setting.findUnique({ where: { key: "discordWebhook" } });
+            if (discordWebhook?.value) {
+                await sendDiscordNotification(discordWebhook.value, "Monitor Down", monitor.name, "OFFLINE", result.responseTime).catch(() => { });
+            }
 
-        const discordWebhook = await prisma.setting.findUnique({ where: { key: "discordWebhook" } });
-        if (discordWebhook?.value) {
-            await sendDiscordNotification(discordWebhook.value, "Monitor Down", monitor.name, "OFFLINE", result.responseTime).catch(() => { });
-        }
+            const notifyDown = await prisma.setting.findUnique({ where: { key: "notifyDown" } });
+            if (notifyDown?.value === "true") {
+                await sendMonitorAlert(monitor.name, "OFFLINE", result.message || "Unreachable").catch(() => { });
+            }
 
-        const notifyDown = await prisma.setting.findUnique({ where: { key: "notifyDown" } });
-        if (notifyDown?.value === "true") {
-            await sendMonitorAlert(monitor.name, "OFFLINE", result.message || "Unreachable").catch(() => { });
-        }
-
-        if (monitor.customWebhook) {
-            fetch(monitor.customWebhook, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ monitorId, name: monitor.name, status: "OFFLINE", timestamp: new Date() })
-            }).catch(() => { });
+            if (monitor.customWebhook) {
+                fetch(monitor.customWebhook, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ monitorId, name: monitor.name, status: "OFFLINE", timestamp: new Date() })
+                }).catch(() => { });
+            }
+        } else {
+            console.log(`[Scheduler] Suppressed: ${cascadeResult.reason}`);
         }
     } else if (previousStatus === "OFFLINE" && result.status === "ONLINE") {
         console.log(`[Scheduler] Monitor UP: ${monitor.name}`);

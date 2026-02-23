@@ -89,6 +89,11 @@ model Monitor {
   regions         String?       @default("eu-central") // comma separated list like "eu-central,us-east,asia-south"
   heartbeatToken  String?       @unique // Unique token for HEARTBEAT monitors
   lastHeartbeat   DateTime?     // Last time a heartbeat ping was received
+
+  // Cascade / Dependency Detection
+  parentMonitorId String?       // If set, this monitor depends on the parent
+  parentMonitor   Monitor?      @relation("MonitorDependency", fields: [parentMonitorId], references: [id], onDelete: SetNull)
+  childMonitors   Monitor[]     @relation("MonitorDependency")
   
   // Timestamps
   createdAt       DateTime      @default(now())

@@ -48,6 +48,7 @@ export async function POST(req: Request) {
                 groupId: data.groupId || null,
                 // Generate unique token for heartbeat monitors
                 heartbeatToken: isHeartbeat ? randomUUID() : null,
+                parentMonitorId: data.parentMonitorId || null,
             },
         });
 

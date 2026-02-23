@@ -132,6 +132,7 @@ export default function MonitorsPage() {
         interval: "300",
         maxResponseTime: "",
         customWebhook: "",
+        parentMonitorId: "",
     });
     const [monitorToDelete, setMonitorToDelete] = useState<{ id: string, name: string } | null>(null);
     const [editMonitor, setEditMonitor] = useState<Monitor | null>(null);
@@ -197,6 +198,7 @@ export default function MonitorsPage() {
             if (newMonitor.keyword) payload.keyword = newMonitor.keyword;
             if (newMonitor.maxResponseTime) payload.maxResponseTime = newMonitor.maxResponseTime;
             if (newMonitor.customWebhook) payload.customWebhook = newMonitor.customWebhook;
+            if (newMonitor.parentMonitorId) payload.parentMonitorId = newMonitor.parentMonitorId;
             payload.regions = selectedRegions.length > 0 ? selectedRegions.join(",") : "local";
 
             const res = await fetch("/api/monitors", {
@@ -209,7 +211,7 @@ export default function MonitorsPage() {
                 const created = await res.json();
                 toast.success("Monitor created and started!");
                 setIsDialogOpen(false);
-                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "" });
+                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", parentMonitorId: "" });
                 setSelectedType("HTTP");
                 // Show heartbeat URL if applicable
                 if (created.heartbeatToken) {
@@ -635,6 +637,30 @@ export default function MonitorsPage() {
                                         {selectedRegions.length === 0 && (
                                             <p className="text-xs text-amber-500">⚠ No region selected — monitor will run locally only.</p>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Parent Monitor (Dependency) */}
+                                {monitors.length > 0 && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">
+                                            Parent Monitor <span className="text-xs text-muted-foreground ml-1 font-normal">(Optional — for dependency detection)</span>
+                                        </label>
+                                        <Select
+                                            value={newMonitor.parentMonitorId}
+                                            onValueChange={(val) => setNewMonitor({ ...newMonitor, parentMonitorId: val === "none" ? "" : val })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="No parent (standalone)" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">No parent (standalone)</SelectItem>
+                                                {monitors.map((m) => (
+                                                    <SelectItem key={m.id} value={m.id}>{m.name} ({m.type})</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">If this monitor&apos;s parent is OFFLINE, its alerts will be automatically suppressed.</p>
                                     </div>
                                 )}
 
