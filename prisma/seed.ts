@@ -9,12 +9,24 @@ const adapter = new PrismaBetterSqlite3({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+    // 1. Check if the database has already been seeded or if users exist
+    const userCount = await prisma.user.count();
+
+    if (userCount > 0) {
+        // If there are already users, we silently skip the seed process
+        // to prevent overwriting or re-creating demo data on every restart.
+        console.log("Database is already initialized. Skipping seed.");
+        return;
+    }
+
+    console.log("-----------------------------------------");
+    console.log("🚀 Initializing Pulse Database for the first time...");
+    console.log("-----------------------------------------");
+
     const hashedPassword = await bcrypt.hash("admin123", 10);
 
-    const admin = await prisma.user.upsert({
-        where: { email: "admin@example.com" },
-        update: {},
-        create: {
+    const admin = await prisma.user.create({
+        data: {
             email: "admin@example.com",
             name: "Admin User",
             password: hashedPassword,
@@ -22,25 +34,19 @@ async function main() {
         },
     });
 
-    console.log({ admin });
-
-    const monitor = await prisma.monitor.upsert({
-        where: { id: "demo-monitor" },
-        update: {},
-        create: {
+    const monitor = await prisma.monitor.create({
+        data: {
             id: "demo-monitor",
-            name: "Google",
-            target: "https://google.com",
+            name: "Pulse Demo Monitor",
+            target: "https://example.com",
             type: "HTTP",
             userId: admin.id,
             status: "ONLINE",
         },
     });
 
-    await prisma.statusPage.upsert({
-        where: { slug: "main" },
-        update: {},
-        create: {
+    await prisma.statusPage.create({
+        data: {
             slug: "main",
             title: "Main Systems Health",
             description: "Public monitoring for our core services.",
@@ -51,7 +57,16 @@ async function main() {
         },
     });
 
-    console.log("Seeding finished.");
+    console.log("✅ Seed completed successfully!\n");
+    console.log("┌───────────────────────────────────────────┐");
+    console.log("│                                           │");
+    console.log("│        🔑 PULSE ADMIN CREDENTIALS         │");
+    console.log("│                                           │");
+    console.log("│   Email:     admin@example.com            │");
+    console.log("│   Password:  admin123                     │");
+    console.log("│                                           │");
+    console.log("└───────────────────────────────────────────┘");
+    console.log("⚠️ Please log in and change these instantly.\n");
 }
 
 main()
