@@ -22,6 +22,7 @@ import {
     CodeXml,
     LineChart,
     Pencil,
+    Heart,
 } from "lucide-react";
 import {
     Table,
@@ -100,6 +101,12 @@ const MONITOR_TYPES = [
             { value: "DISCORD", label: "Discord", icon: MessageSquare, desc: "Discord status API or bot endpoint", placeholder: "https://your-bot.com/health" },
         ],
     },
+    {
+        group: "Cron & Scripts",
+        items: [
+            { value: "HEARTBEAT", label: "Heartbeat", icon: Heart, desc: "Your script pings Pulse — alerts if silent", placeholder: "(auto-generated URL)" },
+        ],
+    },
 ];
 
 const ALL_TYPES = MONITOR_TYPES.flatMap((g) => g.items);
@@ -128,6 +135,7 @@ export default function MonitorsPage() {
     });
     const [monitorToDelete, setMonitorToDelete] = useState<{ id: string, name: string } | null>(null);
     const [editMonitor, setEditMonitor] = useState<Monitor | null>(null);
+    const [heartbeatUrl, setHeartbeatUrl] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({
         name: "",
         target: "",
@@ -198,10 +206,15 @@ export default function MonitorsPage() {
             });
 
             if (res.ok) {
+                const created = await res.json();
                 toast.success("Monitor created and started!");
                 setIsDialogOpen(false);
                 setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "" });
                 setSelectedType("HTTP");
+                // Show heartbeat URL if applicable
+                if (created.heartbeatToken) {
+                    setHeartbeatUrl(`${window.location.origin}/api/heartbeat/${created.heartbeatToken}`);
+                }
                 fetchMonitors();
             } else {
                 const err = await res.json();
@@ -397,9 +410,28 @@ export default function MonitorsPage() {
     const currentTypeInfo = getTypeInfo(selectedType);
     const showPort = ["PORT", "SMTP", "STEAM", "MINECRAFT"].includes(selectedType);
     const showKeyword = selectedType === "KEYWORD";
+    const isHeartbeatType = selectedType === "HEARTBEAT";
 
     return (
         <div className="space-y-6">
+            {/* Heartbeat URL banner — shown after creating a heartbeat monitor */}
+            {heartbeatUrl && (
+                <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-green-400 mb-1">✅ Heartbeat Monitor Created!</p>
+                            <p className="text-xs text-muted-foreground mb-2">Ping this URL from your cron job or script to signal it&apos;s alive. Both GET and POST are accepted.</p>
+                            <code className="block text-xs bg-muted rounded px-3 py-2 text-foreground break-all">{heartbeatUrl}</code>
+                            <p className="text-xs text-muted-foreground mt-2">Example: <code className="bg-muted px-1 rounded">curl {heartbeatUrl}</code></p>
+                        </div>
+                        <button
+                            onClick={() => { navigator.clipboard.writeText(heartbeatUrl); toast.success("URL copied!"); }}
+                            className="shrink-0 text-xs px-2 py-1 rounded border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors"
+                        >Copy</button>
+                    </div>
+                    <button onClick={() => setHeartbeatUrl(null)} className="text-xs text-muted-foreground mt-2 hover:text-foreground">Dismiss</button>
+                </div>
+            )}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Monitors</h1>
@@ -462,23 +494,34 @@ export default function MonitorsPage() {
                                     />
                                 </div>
 
-                                {/* Target */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">
-                                        {selectedType === "DNS" ? "Domain" :
-                                            selectedType === "STEAM" || selectedType === "PORT" ? "IP Address / Host" :
-                                                selectedType === "SSL" ? "Domain (without https://)" :
-                                                    selectedType === "SMTP" ? "Mail Server Host" :
-                                                        selectedType === "DISCORD" ? "Discord Bot User ID" :
-                                                            "Target URL / Host"}
-                                    </label>
-                                    <Input
-                                        placeholder={currentTypeInfo?.placeholder ?? "https://example.com"}
-                                        value={newMonitor.target}
-                                        onChange={(e) => setNewMonitor({ ...newMonitor, target: e.target.value })}
-                                        required={true}
-                                    />
-                                </div>
+                                {/* Target — hidden for HEARTBEAT */}
+                                {!isHeartbeatType && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">
+                                            {selectedType === "DNS" ? "Domain" :
+                                                selectedType === "STEAM" || selectedType === "PORT" ? "IP Address / Host" :
+                                                    selectedType === "SSL" ? "Domain (without https://)" :
+                                                        selectedType === "SMTP" ? "Mail Server Host" :
+                                                            selectedType === "DISCORD" ? "Discord Bot User ID" :
+                                                                "Target URL / Host"}
+                                        </label>
+                                        <Input
+                                            placeholder={currentTypeInfo?.placeholder ?? "https://example.com"}
+                                            value={newMonitor.target}
+                                            onChange={(e) => setNewMonitor({ ...newMonitor, target: e.target.value })}
+                                            required={!isHeartbeatType}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Heartbeat info box */}
+                                {isHeartbeatType && (
+                                    <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-400 space-y-1">
+                                        <p className="font-medium">🫀 How Heartbeat Monitors Work</p>
+                                        <p>After creation, Pulse generates a unique URL for this monitor. Your cron job, script, or service pings that URL periodically. If no ping is received within <strong>1.5× the check interval</strong>, the monitor goes OFFLINE and an alert is triggered.</p>
+                                        <p className="text-muted-foreground">The ping URL will be shown after saving.</p>
+                                    </div>
+                                )}
 
                                 {/* Port (for PORT, SMTP, STEAM, MINECRAFT) */}
                                 {showPort && (

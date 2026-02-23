@@ -22,6 +22,7 @@ enum MonitorType {
   SSL
   SMTP
   STEAM
+  HEARTBEAT
 }
 
 enum MonitorStatus {
@@ -86,6 +87,8 @@ model Monitor {
   maxResponseTime Int?          // Expected SLA. Over this -> Warning incident
   customWebhook   String?       // Pings this specific URL if it goes offline
   regions         String?       @default("eu-central") // comma separated list like "eu-central,us-east,asia-south"
+  heartbeatToken  String?       @unique // Unique token for HEARTBEAT monitors
+  lastHeartbeat   DateTime?     // Last time a heartbeat ping was received
   
   // Timestamps
   createdAt       DateTime      @default(now())

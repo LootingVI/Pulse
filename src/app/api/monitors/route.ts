@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { startMonitor } from "@/lib/scheduler";
+import { randomUUID } from "crypto";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -26,11 +27,14 @@ export async function POST(req: Request) {
     const data = await req.json();
 
     try {
+        const isHeartbeat = data.type === "HEARTBEAT";
+
         const monitor = await prisma.monitor.create({
             data: {
                 name: data.name,
                 type: data.type,
-                target: data.target,
+                // Heartbeat monitors don't have an active target — use placeholder
+                target: isHeartbeat ? "heartbeat" : data.target,
                 port: data.port ? parseInt(data.port) : null,
                 keyword: data.keyword || null,
                 interval: parseInt(data.interval) || 300,
@@ -42,10 +46,11 @@ export async function POST(req: Request) {
                 regions: data.regions || "eu-central",
                 userId,
                 groupId: data.groupId || null,
+                // Generate unique token for heartbeat monitors
+                heartbeatToken: isHeartbeat ? randomUUID() : null,
             },
         });
 
-        // Start monitoring immediately if not paused
         if (!monitor.isPaused) {
             startMonitor(monitor.id, monitor.interval);
         }

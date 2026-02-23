@@ -54,6 +54,12 @@ async function runCheck(monitorId: string) {
         return;
     }
 
+    // ── Heartbeat monitors: don't actively probe — check if ping has expired ──
+    if (monitor.type === "HEARTBEAT") {
+        await runHeartbeatExpiryCheck(monitor, prisma);
+        return;
+    }
+
     const result = await performCheck(
         monitor.type,
         monitor.target,
@@ -205,6 +211,68 @@ async function runCheck(monitorId: string) {
                     aiRCA: `🤖 **AI Analysis:** The target is responding, but at severely degraded speeds (${result.responseTime}ms > ${monitor.maxResponseTime}ms SLA). This suggests resource starvation (CPU/RAM throttling), database locks, or an ongoing DDoS attempt causing massive queue delays.`
                 },
             });
+        }
+    }
+}
+
+/**
+ * For HEARTBEAT monitors, the scheduler doesn't probe anything.
+ * Instead, it checks if the last received heartbeat is older than
+ * the configured interval — if so, the monitor is considered OFFLINE.
+ */
+async function runHeartbeatExpiryCheck(monitor: any, prisma: any) {
+    const now = new Date();
+    const intervalMs = monitor.interval * 1000;
+    // Allow 1.5x the interval as grace period
+    const deadline = new Date(now.getTime() - intervalMs * 1.5);
+
+    const previousStatus = monitor.status;
+    const lastPing: Date | null = monitor.lastHeartbeat;
+
+    // If no ping ever received, or last ping is too old → OFFLINE
+    const isExpired = !lastPing || lastPing < deadline;
+    const newStatus = isExpired ? "OFFLINE" : "ONLINE";
+
+    await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: { status: newStatus, lastChecked: now },
+    });
+
+    if (newStatus === "OFFLINE") {
+        await prisma.checkResult.create({
+            data: { monitorId: monitor.id, status: "OFFLINE", responseTime: 0, region: "heartbeat" },
+        });
+    }
+
+    if (previousStatus === "ONLINE" && newStatus === "OFFLINE") {
+        console.log(`[Scheduler] Heartbeat EXPIRED: ${monitor.name}`);
+
+        const minutesLate = lastPing
+            ? Math.round((now.getTime() - lastPing.getTime()) / 60_000)
+            : null;
+
+        const description = lastPing
+            ? `No heartbeat signal received for ${minutesLate} minute(s). Last ping was at ${lastPing.toISOString()}.`
+            : `No heartbeat signal has ever been received for this monitor.`;
+
+        await prisma.incident.create({
+            data: {
+                monitorId: monitor.id,
+                title: `Heartbeat Missing: ${monitor.name}`,
+                description,
+                status: "INVESTIGATING",
+                aiRCA: `🤖 **AI Analysis:** The scheduled heartbeat signal from "${monitor.name}" has not been received within the expected ${monitor.interval}s interval. This typically indicates the cron job, script, or service responsible for sending the heartbeat has crashed, been stopped, or is experiencing a connectivity issue preventing it from reaching Pulse.`,
+            },
+        });
+
+        const discordWebhook = await prisma.setting.findUnique({ where: { key: "discordWebhook" } });
+        if (discordWebhook?.value) {
+            sendDiscordNotification(discordWebhook.value, "Heartbeat Missing", monitor.name, "OFFLINE", 0).catch(() => { });
+        }
+
+        const notifyDown = await prisma.setting.findUnique({ where: { key: "notifyDown" } });
+        if (notifyDown?.value === "true") {
+            sendMonitorAlert(monitor.name, "OFFLINE", description).catch(() => { });
         }
     }
 }
