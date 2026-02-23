@@ -131,15 +131,19 @@ export async function POST() {
 
     const steps: { step: string; success: boolean; output?: string }[] = [];
 
-    // Step 1: git pull from the public repo
+    // Step 1: fetch + hard reset — always wins over local changes
     try {
-        const pullOutput = execSync(
-            `git pull https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git ${GITHUB_BRANCH}`,
+        execSync(
+            `git fetch https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git ${GITHUB_BRANCH}`,
             { encoding: "utf8", timeout: 60_000 }
         );
-        steps.push({ step: "git pull (LootingVI/Pulse)", success: true, output: pullOutput.trim().slice(0, 400) });
+        const resetOutput = execSync(
+            "git reset --hard FETCH_HEAD",
+            { encoding: "utf8", timeout: 30_000 }
+        );
+        steps.push({ step: "git fetch + reset --hard (LootingVI/Pulse)", success: true, output: resetOutput.trim().slice(0, 400) });
     } catch (e: any) {
-        steps.push({ step: "git pull (LootingVI/Pulse)", success: false, output: e.message });
+        steps.push({ step: "git fetch + reset --hard (LootingVI/Pulse)", success: false, output: e.message });
         return NextResponse.json({ success: false, steps }, { status: 500 });
     }
 
