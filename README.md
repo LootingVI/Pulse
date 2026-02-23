@@ -33,7 +33,7 @@
 - **Public Status Pages** — Share beautiful, real-time status pages with your users (with per-node latency display)
 - **Incident Management** — Automatic incident creation, AI-powered root cause analysis, and manual update posts
 - **Smart Alerts** — Discord webhook & SMTP email notifications on downtime and recovery
-- **Live Analytics** — Latency charts, uptime percentage, SLA tracking and check history per monitor
+- **Live Analytics** — Latency charts, uptime percentage, SLA tracking, and check history per monitor
 - **Badge Generator** — Embed live status badges in any README or website
 - **Monitor Groups** — Organize monitors into logical groups
 - **User Management** — Admin panel with role-based access
@@ -129,7 +129,7 @@ Paste the contents of [`public/edge-probe.js`](public/edge-probe.js) into the ed
 
 In the Worker → Settings → Variables and Secrets:
 - Name: `PROBE_SECRET`
-- Value: any strong random string (e.g. `openssl rand -hex 32`)
+- Value: any strong random string (e.g., `openssl rand -hex 32`)
 
 **3. Register the Worker in Pulse**
 
@@ -146,7 +146,7 @@ Click **Test** to verify connectivity, then **Save Settings**.
 
 **4. Assign Regions to Monitors**
 
-When creating or editing a monitor, select the regions (nodes) that should check it. Each region runs checks independently and results appear in analytics and on the public status page.
+When creating or editing a monitor, select the regions (nodes) that should check it. Each region runs checks independently, and results appear in analytics and on the public status page.
 
 ---
 
