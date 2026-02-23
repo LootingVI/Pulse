@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Server, AlertTriangle, ShieldCheck, Activity, Globe, Trash2, ArrowRightLeft, UserCog, Plus } from "lucide-react";
+import { Users, AlertTriangle, ShieldCheck, Activity, Globe, Trash2, ArrowRightLeft, UserCog, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { ConfirmModal } from "@/components/confirm-modal";
+import { AdminUpdatePanel } from "@/components/admin-update-panel";
 
 
 interface AdminData {
@@ -219,6 +220,9 @@ export default function AdminDashboardPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Update Manager */}
+            <AdminUpdatePanel />
 
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
