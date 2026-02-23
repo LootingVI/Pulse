@@ -52,7 +52,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/pulse.git
+git clone https://github.com/LootingVI/pulse.git
 cd pulse
 
 # 2. Copy the environment file
