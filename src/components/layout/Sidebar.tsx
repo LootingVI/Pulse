@@ -12,6 +12,8 @@ import {
     Settings,
     ShieldCheck,
     FolderTree,
+    CalendarClock,
+    BarChart2,
 } from "lucide-react";
 
 const navigation = [
@@ -19,6 +21,8 @@ const navigation = [
     { name: "Monitors", href: "/dashboard/monitors", icon: Activity },
     { name: "Status Pages", href: "/dashboard/status-pages", icon: Globe },
     { name: "Incidents", href: "/dashboard/incidents", icon: Bell },
+    { name: "Maintenance", href: "/dashboard/maintenance", icon: CalendarClock },
+    { name: "Reports", href: "/dashboard/reports", icon: BarChart2, role: "ADMIN" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
     { name: "Admin Panel", href: "/dashboard/admin", icon: ShieldCheck, role: "ADMIN" },
 ];

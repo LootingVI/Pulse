@@ -79,6 +79,7 @@ model Monitor {
   results         CheckResult[]
   incidents       Incident[]
   statusPages     StatusPage[]  @relation("StatusPageMonitors")
+  maintenanceWindows MaintenanceWindow[] @relation("MaintenanceMonitors")
   
   // New "Pulse Unique" Features
   isPaused        Boolean       @default(false)
@@ -154,4 +155,16 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model MaintenanceWindow {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  monitors    Monitor[] @relation("MaintenanceMonitors")
+  userId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
