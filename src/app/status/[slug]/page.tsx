@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, ShieldCheck, Globe } from "lucide-react";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-
+import { CopyBadgeButton } from "@/components/copy-badge-button";
 export default async function PublicStatusPage({
     params,
 }: {
@@ -167,18 +167,21 @@ export default async function PublicStatusPage({
                                                 />
                                                 <span className="font-semibold">{monitor.name}</span>
                                             </div>
-                                            <span
-                                                className={cn(
-                                                    "text-xs font-medium px-2.5 py-0.5 rounded-full",
-                                                    monitor.status === "ONLINE"
-                                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                                        : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                                )}
-                                            >
-                                                {monitor.status === "ONLINE"
-                                                    ? "Operational"
-                                                    : "Offline"}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <CopyBadgeButton monitorId={monitor.id} />
+                                                <span
+                                                    className={cn(
+                                                        "text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0",
+                                                        monitor.status === "ONLINE"
+                                                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                                            : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                                    )}
+                                                >
+                                                    {monitor.status === "ONLINE"
+                                                        ? "Operational"
+                                                        : "Offline"}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         {/* Real uptime bar */}

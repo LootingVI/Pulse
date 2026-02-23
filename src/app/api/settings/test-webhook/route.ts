@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         await sendDiscordNotification(
             url,
             "✅ Test Notification",
-            "Antigravity/Pulse Test",
+            "Pulse Test",
             "ONLINE",
             120, // dummy ms
             undefined

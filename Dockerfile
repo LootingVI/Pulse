@@ -35,5 +35,5 @@ RUN mkdir -p /app/prisma/data
 
 EXPOSE 3000
 
-# Run migrations then start the app
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# Run db push then start the app
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm start"]

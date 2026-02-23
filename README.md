@@ -82,7 +82,7 @@ cp .env.example .env
 # Edit .env — at minimum set NEXTAUTH_SECRET and DATABASE_URL
 
 # 3. Set up the database
-npx prisma migrate deploy
+npx prisma db push --accept-data-loss
 npx prisma generate
 
 # 4. Start the development server
