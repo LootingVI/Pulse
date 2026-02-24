@@ -23,6 +23,8 @@ import {
     LineChart,
     Pencil,
     Heart,
+    Tag,
+    X,
 } from "lucide-react";
 import {
     Table,
@@ -468,6 +470,21 @@ export default function MonitorsPage() {
         setSelectedMonitorIds(next);
     };
 
+    const allUniqueTags = Array.from(new Set(
+        monitors.flatMap(m => m.tags ? m.tags.split(",").map(t => t.trim()) : [])
+    )).filter(Boolean).sort();
+
+    const toggleTagInString = (currentTags: string, tagToToggle: string) => {
+        const tags = currentTags.split(",").map(t => t.trim()).filter(Boolean);
+        const index = tags.indexOf(tagToToggle);
+        if (index > -1) {
+            tags.splice(index, 1);
+        } else {
+            tags.push(tagToToggle);
+        }
+        return tags.join(", ");
+    };
+
     return (
         <div className="space-y-6">
             {/* Heartbeat URL banner — shown after creating a heartbeat monitor */}
@@ -666,6 +683,23 @@ export default function MonitorsPage() {
                                         value={newMonitor.tags}
                                         onChange={(e) => setNewMonitor({ ...newMonitor, tags: e.target.value })}
                                     />
+                                    {allUniqueTags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                            {allUniqueTags.map(tag => (
+                                                <button
+                                                    key={tag}
+                                                    type="button"
+                                                    onClick={() => setNewMonitor({ ...newMonitor, tags: toggleTagInString(newMonitor.tags, tag) })}
+                                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${newMonitor.tags.split(",").map(s => s.trim()).includes(tag)
+                                                        ? "bg-primary text-primary-foreground border-primary"
+                                                        : "bg-background border-border hover:bg-muted"
+                                                        }`}
+                                                >
+                                                    {tag}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Edge Node Regions */}
@@ -737,16 +771,46 @@ export default function MonitorsPage() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-4">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Filter by tags (comma separated)..."
-                        className="pl-8"
-                        value={tagFilter}
-                        onChange={(e) => setTagFilter(e.target.value)}
-                    />
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1 max-w-sm">
+                        <Tag className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Filter by tags (e.g. prod, api)..."
+                            className="pl-8 pr-8"
+                            value={tagFilter}
+                            onChange={(e) => setTagFilter(e.target.value)}
+                        />
+                        {tagFilter && (
+                            <button
+                                onClick={() => setTagFilter("")}
+                                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
                 </div>
+
+                {allUniqueTags.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground font-medium mr-1 uppercase tracking-wider">Quick Filter:</span>
+                        {allUniqueTags.map(tag => (
+                            <button
+                                key={tag}
+                                onClick={() => setTagFilter(tag === tagFilter ? "" : tag)}
+                                className={cn(
+                                    "text-[11px] px-2 py-0.5 rounded-full border transition-all",
+                                    tagFilter === tag
+                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                )}
+                            >
+                                {tag}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {selectedMonitorIds.size > 0 && (
@@ -776,6 +840,13 @@ export default function MonitorsPage() {
                     <Button size="sm" variant="destructive" className="h-8 rounded-full ml-2" onClick={() => handleBulkAction("DELETE")}>
                         Delete
                     </Button>
+                    <Button size="sm" variant="outline" className="h-8 rounded-full border-dashed" onClick={() => {
+                        const newTags = prompt("Enter replacement tags for selected monitors (comma separated):");
+                        if (newTags !== null) handleBulkAction("UPDATE_TAGS", { tags: newTags });
+                    }}>
+                        <Tag className="h-3.5 w-3.5 mr-1" />
+                        Tags
+                    </Button>
                     <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-full" onClick={() => setSelectedMonitorIds(new Set())}>
                         ✕
                     </Button>
@@ -797,6 +868,7 @@ export default function MonitorsPage() {
                             <TableHead className="w-24">Status</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead className="w-28">Type</TableHead>
+                            <TableHead className="w-40">Tags</TableHead>
                             <TableHead>Target</TableHead>
                             <TableHead className="w-24">Interval</TableHead>
                             <TableHead className="w-32">Last Check</TableHead>
@@ -830,20 +902,32 @@ export default function MonitorsPage() {
                                     <TableCell>{getStatusBadge(monitor)}</TableCell>
                                     <TableCell className="font-medium">
                                         {monitor.name}
-                                        {monitor.tags && (
-                                            <div className="flex gap-1 mt-1 flex-wrap">
-                                                {monitor.tags.split(",").map((t, idx) => (
-                                                    <span key={idx} className="text-[10px] bg-muted/50 border px-1.5 py-0.5 rounded-sm text-muted-foreground">
-                                                        {t.trim()}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                                             {getTypeIcon(monitor.type)}
                                             {monitor.type}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {monitor.tags ? (
+                                                monitor.tags.split(",").map((t, idx) => (
+                                                    <Badge
+                                                        key={idx}
+                                                        variant="outline"
+                                                        className="text-[10px] bg-muted/30 font-normal px-2 py-0 h-5"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setTagFilter(t.trim());
+                                                        }}
+                                                    >
+                                                        {t.trim()}
+                                                    </Badge>
+                                                ))
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground/40 italic">No tags</span>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground text-sm truncate max-w-[180px]">
@@ -1002,6 +1086,23 @@ export default function MonitorsPage() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Tags <span className="text-xs text-muted-foreground ml-1">(comma-separated)</span></label>
                             <Input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="prod, backend" />
+                            {allUniqueTags.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                    {allUniqueTags.map(tag => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => setEditForm({ ...editForm, tags: toggleTagInString(editForm.tags, tag) })}
+                                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${editForm.tags.split(",").map(s => s.trim()).includes(tag)
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-background border-border hover:bg-muted"
+                                                }`}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Check Interval</label>
