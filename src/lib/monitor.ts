@@ -339,7 +339,8 @@ export async function performCheck(
     target: string,
     port?: number | null,
     timeout: number = 30,
-    keyword?: string | null
+    keyword?: string | null,
+    flowSteps?: string | null
 ): Promise<CheckResult> {
     const start = Date.now();
     const timeoutMs = timeout * 1000;
@@ -406,6 +407,55 @@ export async function performCheck(
         // ─── STEAM ────────────────────────────────────────────────────────────
         if (type === 'STEAM') {
             return checkSteam(target, port || 27015, timeoutMs);
+        }
+
+        // ─── FLOW (Sequence of HTTP requests) ──────────────────────────────────
+        if (type === 'FLOW' && flowSteps) {
+            try {
+                const steps = JSON.parse(flowSteps);
+                if (!Array.isArray(steps) || steps.length === 0) {
+                    return { status: 'OFFLINE', responseTime: 0, message: 'Flow has no steps defined' };
+                }
+
+                let totalTime = 0;
+                for (let i = 0; i < steps.length; i++) {
+                    const step = steps[i];
+                    const stepStart = Date.now();
+
+                    const response = await axios({
+                        method: step.method || 'GET',
+                        url: step.url,
+                        data: step.body ? (typeof step.body === 'string' ? JSON.parse(step.body) : step.body) : undefined,
+                        timeout: timeoutMs / steps.length, // share timeout across steps
+                        validateStatus: () => true,
+                    });
+
+                    totalTime += (Date.now() - stepStart);
+
+                    // Check status code
+                    const expectedCode = step.expectedCode ? parseInt(step.expectedCode) : 200;
+                    if (response.status !== expectedCode) {
+                        return {
+                            status: 'OFFLINE',
+                            responseTime: totalTime,
+                            message: `Step ${i + 1} failed: Expected HTTP ${expectedCode}, got ${response.status}`
+                        };
+                    }
+
+                    // Check expected body keyword
+                    if (step.expectedBody && !response.data.toString().includes(step.expectedBody)) {
+                        return {
+                            status: 'OFFLINE',
+                            responseTime: totalTime,
+                            message: `Step ${i + 1} failed: Keyword "${step.expectedBody}" not found in response`
+                        };
+                    }
+                }
+
+                return { status: 'ONLINE', responseTime: totalTime, message: `Flow successful (${steps.length} steps)` };
+            } catch (err: any) {
+                return { status: 'OFFLINE', responseTime: 0, message: `Flow config error: ${err.message}` };
+            }
         }
 
         return { status: 'OFFLINE', responseTime: 0, message: 'Unsupported monitor type' };

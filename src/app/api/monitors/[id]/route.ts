@@ -62,6 +62,7 @@ export async function PATCH(
             isPaused: data.isPaused !== undefined ? data.isPaused : existing.isPaused,
             regions: data.regions !== undefined ? data.regions : existing.regions,
             tags: data.tags !== undefined ? data.tags : (existing as any).tags,
+            flowSteps: data.flowSteps !== undefined ? data.flowSteps : (existing as any).flowSteps,
         },
     });
 

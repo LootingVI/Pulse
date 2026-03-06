@@ -23,6 +23,7 @@ enum MonitorType {
   SMTP
   STEAM
   HEARTBEAT
+  FLOW
 }
 
 enum MonitorStatus {
@@ -89,6 +90,9 @@ model Monitor {
   regions         String?       @default("eu-central") // comma separated list like "eu-central,us-east,asia-south"
   heartbeatToken  String?       @unique // Unique token for HEARTBEAT monitors
   lastHeartbeat   DateTime?     // Last time a heartbeat ping was received
+
+  // Flow Checks (New Feature)
+  flowSteps       String?       // JSON string of steps [ { method, url, body, expectedCode, expectedBody } ]
 
   // Cascade / Dependency Detection
   parentMonitorId String?       // If set, this monitor depends on the parent

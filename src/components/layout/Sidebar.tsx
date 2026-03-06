@@ -21,6 +21,7 @@ const navigation = [
     { name: "Monitors", href: "/dashboard/monitors", icon: Activity },
     { name: "Status Pages", href: "/dashboard/status-pages", icon: Globe },
     { name: "Incidents", href: "/dashboard/incidents", icon: Bell },
+    { name: "Infrastructure", href: "/dashboard/topology", icon: FolderTree },
     { name: "Maintenance", href: "/dashboard/maintenance", icon: CalendarClock },
     { name: "Reports", href: "/dashboard/reports", icon: BarChart2, role: "ADMIN" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },

@@ -50,6 +50,7 @@ export async function POST(req: Request) {
                 heartbeatToken: isHeartbeat ? randomUUID() : null,
                 parentMonitorId: data.parentMonitorId || null,
                 tags: data.tags || null,
+                flowSteps: data.flowSteps || null,
             },
         });
 

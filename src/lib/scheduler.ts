@@ -67,7 +67,8 @@ async function runCheck(monitorId: string) {
         monitor.target,
         monitor.port,
         monitor.timeout,
-        monitor.keyword
+        monitor.keyword,
+        monitor.flowSteps
     );
 
     const previousStatus = monitor.status;

@@ -56,7 +56,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 
-interface Monitor {
+export interface Monitor {
     id: string;
     name: string;
     type: string;
@@ -71,6 +71,8 @@ interface Monitor {
     keyword: string | null;
     regions: string;
     tags: string | null;
+    flowSteps?: string;
+    parentMonitorId?: string | null;
 }
 
 const MONITOR_TYPES = [
@@ -105,9 +107,9 @@ const MONITOR_TYPES = [
         ],
     },
     {
-        group: "Cron & Scripts",
+        group: "Advanced",
         items: [
-            { value: "HEARTBEAT", label: "Heartbeat", icon: Heart, desc: "Your script pings Pulse — alerts if silent", placeholder: "(auto-generated URL)" },
+            { value: "FLOW", label: "Flow (E2E)", icon: Zap, desc: "Chain of HTTP requests with logic", placeholder: "https://api.example.com" },
         ],
     },
 ];
@@ -135,8 +137,10 @@ export default function MonitorsPage() {
         interval: "300",
         maxResponseTime: "",
         customWebhook: "",
+        regions: "eu-central", // Added regions default
         parentMonitorId: "",
         tags: "",
+        flowSteps: "[]", // Added flowSteps
     });
     const [monitorToDelete, setMonitorToDelete] = useState<{ id: string, name: string } | null>(null);
     const [editMonitor, setEditMonitor] = useState<Monitor | null>(null);
@@ -153,6 +157,7 @@ export default function MonitorsPage() {
         customWebhook: "",
         regions: "",
         tags: "",
+        flowSteps: "", // Added flowSteps
     });
     const [isEditSaving, setIsEditSaving] = useState(false);
 
@@ -207,6 +212,7 @@ export default function MonitorsPage() {
             if (newMonitor.customWebhook) payload.customWebhook = newMonitor.customWebhook;
             if (newMonitor.parentMonitorId) payload.parentMonitorId = newMonitor.parentMonitorId;
             if (newMonitor.tags) payload.tags = newMonitor.tags;
+            if (newMonitor.flowSteps) payload.flowSteps = newMonitor.flowSteps; // Added flowSteps
             payload.regions = selectedRegions.length > 0 ? selectedRegions.join(",") : "local";
 
             const res = await fetch("/api/monitors", {
@@ -219,7 +225,7 @@ export default function MonitorsPage() {
                 const created = await res.json();
                 toast.success("Monitor created and started!");
                 setIsDialogOpen(false);
-                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", parentMonitorId: "", tags: "" });
+                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", regions: "eu-central", parentMonitorId: "", tags: "", flowSteps: "[]" }); // Updated newMonitor reset
                 setSelectedType("HTTP");
                 // Show heartbeat URL if applicable
                 if (created.heartbeatToken) {
@@ -270,6 +276,7 @@ export default function MonitorsPage() {
                     customWebhook: monitor.customWebhook,
                     regions: monitor.regions,
                     tags: monitor.tags,
+                    flowSteps: monitor.flowSteps, // Added flowSteps
                 }),
             });
             if (res.ok) {
@@ -336,6 +343,7 @@ export default function MonitorsPage() {
             customWebhook: monitor.customWebhook || "",
             regions: monitor.regions || "",
             tags: monitor.tags || "",
+            flowSteps: monitor.flowSteps || "[]", // Added flowSteps
         });
     };
 
@@ -1047,6 +1055,212 @@ export default function MonitorsPage() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Keyword</label>
                                 <Input value={editForm.keyword} onChange={(e) => setEditForm({ ...editForm, keyword: e.target.value })} />
+                            </div>
+                        )}
+
+                        {selectedType === "FLOW" && (
+                            <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <Zap className="h-4 w-4 text-yellow-500" />
+                                        Flow Steps
+                                    </h4>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                            steps.push({ method: "GET", url: "", expectedCode: "200" });
+                                            setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                        }}
+                                    >
+                                        Add Step
+                                    </Button>
+                                </div>
+                                <div className="space-y-3">
+                                    {JSON.parse(newMonitor.flowSteps || "[]").map((step: any, idx: number) => (
+                                        <div key={idx} className="p-3 border rounded-md bg-background space-y-3 relative group">
+                                            <button
+                                                type="button"
+                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                                                onClick={() => {
+                                                    const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                    steps.splice(idx, 1);
+                                                    setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <Select
+                                                    value={step.method || "GET"}
+                                                    onValueChange={(val) => {
+                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                        steps[idx].method = val;
+                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="GET">GET</SelectItem>
+                                                        <SelectItem value="POST">POST</SelectItem>
+                                                        <SelectItem value="PUT">PUT</SelectItem>
+                                                        <SelectItem value="DELETE">DELETE</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input
+                                                    className="col-span-3 h-8"
+                                                    placeholder="URL (e.g. /api/health)"
+                                                    value={step.url}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                        steps[idx].url = e.target.value;
+                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="Expected HTTP Code"
+                                                    value={step.expectedCode}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                        steps[idx].expectedCode = e.target.value;
+                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="Expected Keyword"
+                                                    value={step.expectedBody}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                        steps[idx].expectedBody = e.target.value;
+                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            </div>
+                                            {(step.method === "POST" || step.method === "PUT") && (
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="JSON Body (optional)"
+                                                    value={step.body || ""}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
+                                                        steps[idx].body = e.target.value;
+                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                    {JSON.parse(newMonitor.flowSteps || "[]").length === 0 && (
+                                        <p className="text-xs text-muted-foreground text-center py-4 italic">No steps defined. Add one to start.</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {editMonitor?.type === "FLOW" && (
+                            <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <Zap className="h-4 w-4 text-yellow-500" />
+                                        Flow Steps
+                                    </h4>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const steps = JSON.parse(editForm.flowSteps || "[]");
+                                            steps.push({ method: "GET", url: "", expectedCode: "200" });
+                                            setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                        }}
+                                    >
+                                        Add Step
+                                    </Button>
+                                </div>
+                                <div className="space-y-3">
+                                    {JSON.parse(editForm.flowSteps || "[]").map((step: any, idx: number) => (
+                                        <div key={idx} className="p-3 border rounded-md bg-background space-y-3 relative group">
+                                            <button
+                                                type="button"
+                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                                                onClick={() => {
+                                                    const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                    steps.splice(idx, 1);
+                                                    setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <Select
+                                                    value={step.method || "GET"}
+                                                    onValueChange={(val) => {
+                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                        steps[idx].method = val;
+                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="GET">GET</SelectItem>
+                                                        <SelectItem value="POST">POST</SelectItem>
+                                                        <SelectItem value="PUT">PUT</SelectItem>
+                                                        <SelectItem value="DELETE">DELETE</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input
+                                                    className="col-span-3 h-8"
+                                                    placeholder="URL (e.g. /api/health)"
+                                                    value={step.url}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                        steps[idx].url = e.target.value;
+                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="Expected HTTP Code"
+                                                    value={step.expectedCode}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                        steps[idx].expectedCode = e.target.value;
+                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="Expected Keyword"
+                                                    value={step.expectedBody}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                        steps[idx].expectedBody = e.target.value;
+                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            </div>
+                                            {(step.method === "POST" || step.method === "PUT") && (
+                                                <Input
+                                                    className="h-8"
+                                                    placeholder="JSON Body (optional)"
+                                                    value={step.body || ""}
+                                                    onChange={(e) => {
+                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                        steps[idx].body = e.target.value;
+                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                         <div className="grid grid-cols-2 gap-4">
