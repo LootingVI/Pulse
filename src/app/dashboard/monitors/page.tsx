@@ -107,6 +107,12 @@ const MONITOR_TYPES = [
         ],
     },
     {
+        group: "Cron & Scripts",
+        items: [
+            { value: "HEARTBEAT", label: "Heartbeat", icon: Heart, desc: "Your script pings Pulse — alerts if silent", placeholder: "(auto-generated URL)" },
+        ],
+    },
+    {
         group: "Advanced",
         items: [
             { value: "FLOW", label: "Flow (E2E)", icon: Zap, desc: "Chain of HTTP requests with logic", placeholder: "https://api.example.com" },
