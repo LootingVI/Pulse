@@ -28,6 +28,9 @@
 
 ## ✨ Features
 
+- **3D Nerve System Map** — Interactive 3D topology visualization of your infrastructure using React Three Fiber & Three.js
+- **Self-Healing Webhooks** — Automatically trigger recovery actions (restarts, deployments, cache clears) when a service fails
+- **Flow Checks (E2E)** — Chain multiple HTTP requests with logic to test complex user flows and multi-step APIs
 - **10+ Monitor Types** — HTTP(s), Keyword, SSL/TLS, DNS, Port, SMTP, Ping, Minecraft, Steam, Discord
 - **Multi-Region Probing** — Deploy Cloudflare Workers as edge probes for distributed, real-world checks from multiple geographic regions
 - **Public Status Pages** — Share beautiful, real-time status pages with your users (with per-node latency display)
@@ -52,7 +55,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/pulse.git
+git clone https://github.com/LootingVI/pulse.git
 cd pulse
 
 # 2. Copy the environment file
@@ -73,7 +76,7 @@ Visit **http://localhost:3000** and register your first account.
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/pulse.git
+git clone https://github.com/LootingVI/pulse.git
 cd pulse
 npm install
 
@@ -191,6 +194,7 @@ Pulse exposes a REST API. See [`API_DOCS.md`](API_DOCS.md) for full documentatio
 | Framework | [Next.js 15](https://nextjs.org) (App Router) |
 | Language | TypeScript |
 | Database | SQLite (Prisma ORM) |
+| 3D Visualization | [React Three Fiber](https://r3f.docs.pmnd.rs/) + [Three.js](https://threejs.org/) |
 | Auth | NextAuth.js |
 | UI | shadcn/ui + Tailwind CSS |
 | Charts | Recharts |
