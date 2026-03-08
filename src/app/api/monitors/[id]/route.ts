@@ -63,6 +63,11 @@ export async function PATCH(
             regions: data.regions !== undefined ? data.regions : existing.regions,
             tags: data.tags !== undefined ? data.tags : (existing as any).tags,
             flowSteps: data.flowSteps !== undefined ? data.flowSteps : (existing as any).flowSteps,
+            recoveryEnabled: data.recoveryEnabled !== undefined ? data.recoveryEnabled : (existing as any).recoveryEnabled,
+            recoveryWebhookUrl: data.recoveryWebhookUrl !== undefined ? data.recoveryWebhookUrl : (existing as any).recoveryWebhookUrl,
+            recoveryWebhookMethod: data.recoveryWebhookMethod !== undefined ? data.recoveryWebhookMethod : (existing as any).recoveryWebhookMethod,
+            recoveryWebhookBody: data.recoveryWebhookBody !== undefined ? data.recoveryWebhookBody : (existing as any).recoveryWebhookBody,
+            recoveryInterval: data.recoveryInterval !== undefined ? parseInt(data.recoveryInterval) : (existing as any).recoveryInterval,
         },
     });
 

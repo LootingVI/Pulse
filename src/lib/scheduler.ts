@@ -8,6 +8,35 @@ import { sendDiscordNotification } from "./notifications";
 import { sendMonitorAlert } from "./email";
 import { handleCascadeDetection } from "./cascade";
 import { decrypt } from "./encryption";
+import axios from "axios";
+
+// Self-healing trigger
+async function triggerRecovery(monitor: any) {
+    if (!monitor.recoveryEnabled || !monitor.recoveryWebhookUrl) return;
+
+    console.log(`[Self-Healing] Triggering recovery for ${monitor.name}...`);
+
+    try {
+        if (monitor.recoveryInterval > 0) {
+            await new Promise(resolve => setTimeout(resolve, monitor.recoveryInterval * 1000));
+        }
+
+        const body = monitor.recoveryWebhookBody
+            ? (typeof monitor.recoveryWebhookBody === 'string' ? JSON.parse(monitor.recoveryWebhookBody) : monitor.recoveryWebhookBody)
+            : undefined;
+
+        await axios({
+            method: monitor.recoveryWebhookMethod || "POST",
+            url: monitor.recoveryWebhookUrl,
+            data: body,
+            timeout: 10000,
+        });
+
+        console.log(`[Self-Healing] Recovery webhook sent successfully for ${monitor.name}`);
+    } catch (err: any) {
+        console.error(`[Self-Healing] Failed to trigger recovery for ${monitor.name}:`, err.message);
+    }
+}
 
 export function generateMockRCA(monitorType: string, message: string): string {
     const aiPrefix = "🤖 **AI Analysis:** Based on telemetric patterns, ";
@@ -72,6 +101,11 @@ async function runCheck(monitorId: string) {
     );
 
     const previousStatus = monitor.status;
+
+    if (result.status === "OFFLINE" && previousStatus === "ONLINE" && monitor.recoveryEnabled) {
+        // Fire & Forget recovery trigger
+        triggerRecovery(monitor);
+    }
 
     await prisma.monitor.update({
         where: { id: monitorId },

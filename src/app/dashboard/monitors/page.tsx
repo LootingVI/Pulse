@@ -35,6 +35,13 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import {
     Dialog,
     DialogContent,
     DialogHeader,
@@ -55,6 +62,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
+import { SelfHealingTutorial } from "@/components/SelfHealingTutorial";
 
 export interface Monitor {
     id: string;
@@ -73,6 +81,12 @@ export interface Monitor {
     tags: string | null;
     flowSteps?: string;
     parentMonitorId?: string | null;
+    recoveryEnabled?: boolean;
+    recoveryWebhookUrl?: string | null;
+    recoveryWebhookMethod?: string | null;
+    recoveryWebhookBody?: string | null;
+    recoveryInterval?: number;
+    recoveryRetries?: number;
 }
 
 const MONITOR_TYPES = [
@@ -146,7 +160,12 @@ export default function MonitorsPage() {
         regions: "eu-central", // Added regions default
         parentMonitorId: "",
         tags: "",
-        flowSteps: "[]", // Added flowSteps
+        flowSteps: "[]",
+        recoveryEnabled: false,
+        recoveryWebhookUrl: "",
+        recoveryWebhookMethod: "POST",
+        recoveryWebhookBody: "",
+        recoveryInterval: "0",
     });
     const [monitorToDelete, setMonitorToDelete] = useState<{ id: string, name: string } | null>(null);
     const [editMonitor, setEditMonitor] = useState<Monitor | null>(null);
@@ -163,7 +182,12 @@ export default function MonitorsPage() {
         customWebhook: "",
         regions: "",
         tags: "",
-        flowSteps: "", // Added flowSteps
+        flowSteps: "",
+        recoveryEnabled: false,
+        recoveryWebhookUrl: "",
+        recoveryWebhookMethod: "POST",
+        recoveryWebhookBody: "",
+        recoveryInterval: "0",
     });
     const [isEditSaving, setIsEditSaving] = useState(false);
 
@@ -218,8 +242,15 @@ export default function MonitorsPage() {
             if (newMonitor.customWebhook) payload.customWebhook = newMonitor.customWebhook;
             if (newMonitor.parentMonitorId) payload.parentMonitorId = newMonitor.parentMonitorId;
             if (newMonitor.tags) payload.tags = newMonitor.tags;
-            if (newMonitor.flowSteps) payload.flowSteps = newMonitor.flowSteps; // Added flowSteps
+            if (newMonitor.flowSteps) payload.flowSteps = newMonitor.flowSteps;
             payload.regions = selectedRegions.length > 0 ? selectedRegions.join(",") : "local";
+
+            // Self-Healing Payload
+            payload.recoveryEnabled = newMonitor.recoveryEnabled;
+            payload.recoveryWebhookUrl = newMonitor.recoveryWebhookUrl;
+            payload.recoveryWebhookMethod = newMonitor.recoveryWebhookMethod;
+            payload.recoveryWebhookBody = newMonitor.recoveryWebhookBody;
+            payload.recoveryInterval = newMonitor.recoveryInterval;
 
             const res = await fetch("/api/monitors", {
                 method: "POST",
@@ -231,7 +262,17 @@ export default function MonitorsPage() {
                 const created = await res.json();
                 toast.success("Monitor created and started!");
                 setIsDialogOpen(false);
-                setNewMonitor({ name: "", type: "HTTP", target: "", port: "", keyword: "", interval: "300", maxResponseTime: "", customWebhook: "", regions: "eu-central", parentMonitorId: "", tags: "", flowSteps: "[]" }); // Updated newMonitor reset
+                setNewMonitor({
+                    name: "", type: "HTTP", target: "", port: "", keyword: "",
+                    interval: "300", maxResponseTime: "", customWebhook: "",
+                    regions: "eu-central", parentMonitorId: "", tags: "",
+                    flowSteps: "[]",
+                    recoveryEnabled: false,
+                    recoveryWebhookUrl: "",
+                    recoveryWebhookMethod: "POST",
+                    recoveryWebhookBody: "",
+                    recoveryInterval: "0"
+                });
                 setSelectedType("HTTP");
                 // Show heartbeat URL if applicable
                 if (created.heartbeatToken) {
@@ -349,7 +390,12 @@ export default function MonitorsPage() {
             customWebhook: monitor.customWebhook || "",
             regions: monitor.regions || "",
             tags: monitor.tags || "",
-            flowSteps: monitor.flowSteps || "[]", // Added flowSteps
+            flowSteps: monitor.flowSteps || "[]",
+            recoveryEnabled: monitor.recoveryEnabled || false,
+            recoveryWebhookUrl: monitor.recoveryWebhookUrl || "",
+            recoveryWebhookMethod: monitor.recoveryWebhookMethod || "POST",
+            recoveryWebhookBody: monitor.recoveryWebhookBody || "",
+            recoveryInterval: String(monitor.recoveryInterval || 0),
         });
     };
 
@@ -369,6 +415,14 @@ export default function MonitorsPage() {
             if (editForm.customWebhook) payload.customWebhook = editForm.customWebhook;
             if (editForm.regions) payload.regions = editForm.regions;
             payload.tags = editForm.tags;
+            payload.flowSteps = editForm.flowSteps;
+
+            // Self-Healing Payload (Edit)
+            payload.recoveryEnabled = editForm.recoveryEnabled;
+            payload.recoveryWebhookUrl = editForm.recoveryWebhookUrl;
+            payload.recoveryWebhookMethod = editForm.recoveryWebhookMethod;
+            payload.recoveryWebhookBody = editForm.recoveryWebhookBody;
+            payload.recoveryInterval = editForm.recoveryInterval;
 
             const res = await fetch(`/api/monitors/${editMonitor.id}`, {
                 method: "PATCH",
@@ -540,242 +594,204 @@ export default function MonitorsPage() {
                                 <DialogTitle>Add New Monitor</DialogTitle>
                             </DialogHeader>
                             <form onSubmit={handleAddMonitor} className="space-y-4 pt-2">
-                                {/* Type selector */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Protocol / Type</label>
-                                    <Select value={selectedType} onValueChange={handleTypeChange}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {MONITOR_TYPES.map((group) => (
-                                                <SelectGroup key={group.group}>
-                                                    <SelectLabel>{group.group}</SelectLabel>
-                                                    {group.items.map((item) => (
-                                                        <SelectItem key={item.value} value={item.value}>
-                                                            <div className="flex flex-col">
-                                                                <span>{item.label}</span>
-                                                                <span className="text-xs text-muted-foreground">{item.desc}</span>
-                                                            </div>
-                                                        </SelectItem>
+                                <Tabs defaultValue="general" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="general">General</TabsTrigger>
+                                        <TabsTrigger value="automation">Automation & Healing</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="general" className="space-y-4 mt-4">
+                                        {/* Type selector */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Protocol / Type</label>
+                                            <Select value={selectedType} onValueChange={handleTypeChange}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {MONITOR_TYPES.map((group) => (
+                                                        <SelectGroup key={group.group}>
+                                                            <SelectLabel>{group.group}</SelectLabel>
+                                                            {group.items.map((item) => (
+                                                                <SelectItem key={item.value} value={item.value}>
+                                                                    <div className="flex flex-col">
+                                                                        <span>{item.label}</span>
+                                                                        <span className="text-xs text-muted-foreground">{item.desc}</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectGroup>
                                                     ))}
-                                                </SelectGroup>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {currentTypeInfo && (
-                                        <p className="text-xs text-muted-foreground pl-1">
-                                            {currentTypeInfo.desc}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Name */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Display Name</label>
-                                    <Input
-                                        placeholder="My Minecraft Server"
-                                        value={newMonitor.name}
-                                        onChange={(e) => setNewMonitor({ ...newMonitor, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                {/* Target — hidden for HEARTBEAT */}
-                                {!isHeartbeatType && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            {selectedType === "DNS" ? "Domain" :
-                                                selectedType === "STEAM" || selectedType === "PORT" ? "IP Address / Host" :
-                                                    selectedType === "SSL" ? "Domain (without https://)" :
-                                                        selectedType === "SMTP" ? "Mail Server Host" :
-                                                            selectedType === "DISCORD" ? "Discord Bot User ID" :
-                                                                "Target URL / Host"}
-                                        </label>
-                                        <Input
-                                            placeholder={currentTypeInfo?.placeholder ?? "https://example.com"}
-                                            value={newMonitor.target}
-                                            onChange={(e) => setNewMonitor({ ...newMonitor, target: e.target.value })}
-                                            required={!isHeartbeatType}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Heartbeat info box */}
-                                {isHeartbeatType && (
-                                    <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-400 space-y-1">
-                                        <p className="font-medium">🫀 How Heartbeat Monitors Work</p>
-                                        <p>After creation, Pulse generates a unique URL for this monitor. Your cron job, script, or service pings that URL periodically. If no ping is received within <strong>1.5× the check interval</strong>, the monitor goes OFFLINE and an alert is triggered.</p>
-                                        <p className="text-muted-foreground">The ping URL will be shown after saving.</p>
-                                    </div>
-                                )}
-
-                                {/* Port (for PORT, SMTP, STEAM, MINECRAFT) */}
-                                {showPort && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Port
-                                            <span className="text-muted-foreground ml-1 font-normal text-xs">
-                                                {selectedType === "MINECRAFT" && "(default: 25565)"}
-                                                {selectedType === "STEAM" && "(default: 27015)"}
-                                                {selectedType === "SMTP" && "(default: 25)"}
-                                            </span>
-                                        </label>
-                                        <Input
-                                            type="number"
-                                            placeholder={
-                                                selectedType === "MINECRAFT" ? "25565" :
-                                                    selectedType === "STEAM" ? "27015" :
-                                                        selectedType === "SMTP" ? "25" : "80"
-                                            }
-                                            value={newMonitor.port}
-                                            onChange={(e) => setNewMonitor({ ...newMonitor, port: e.target.value })}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Keyword (for KEYWORD type) */}
-                                {showKeyword && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Keyword to find</label>
-                                        <Input
-                                            placeholder="Online"
-                                            value={newMonitor.keyword}
-                                            onChange={(e) => setNewMonitor({ ...newMonitor, keyword: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Advanced/Unique Features */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Max Expected Response Time (ms) <span className="text-xs text-muted-foreground ml-1">(Optional)</span></label>
-                                        <Input
-                                            type="number"
-                                            placeholder="1000"
-                                            value={newMonitor.maxResponseTime}
-                                            onChange={(e) => setNewMonitor({ ...newMonitor, maxResponseTime: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Custom Webhook Trigger <span className="text-xs text-muted-foreground ml-1">(Optional)</span></label>
-                                        <Input
-                                            type="url"
-                                            placeholder="https://api.example.com/webhook"
-                                            value={newMonitor.customWebhook}
-                                            onChange={(e) => setNewMonitor({ ...newMonitor, customWebhook: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Interval */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Check Interval</label>
-                                    <Select
-                                        value={newMonitor.interval}
-                                        onValueChange={(val) => setNewMonitor({ ...newMonitor, interval: val })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="60">Every 1 minute</SelectItem>
-                                            <SelectItem value="300">Every 5 minutes</SelectItem>
-                                            <SelectItem value="600">Every 10 minutes</SelectItem>
-                                            <SelectItem value="1800">Every 30 minutes</SelectItem>
-                                            <SelectItem value="3600">Every hour</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Tags */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Tags <span className="text-xs text-muted-foreground ml-1">(comma-separated)</span></label>
-                                    <Input
-                                        placeholder="prod, frontend, api"
-                                        value={newMonitor.tags}
-                                        onChange={(e) => setNewMonitor({ ...newMonitor, tags: e.target.value })}
-                                    />
-                                    {allUniqueTags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 pt-1">
-                                            {allUniqueTags.map(tag => (
-                                                <button
-                                                    key={tag}
-                                                    type="button"
-                                                    onClick={() => setNewMonitor({ ...newMonitor, tags: toggleTagInString(newMonitor.tags, tag) })}
-                                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${newMonitor.tags.split(",").map(s => s.trim()).includes(tag)
-                                                        ? "bg-primary text-primary-foreground border-primary"
-                                                        : "bg-background border-border hover:bg-muted"
-                                                        }`}
-                                                >
-                                                    {tag}
-                                                </button>
-                                            ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {currentTypeInfo && (
+                                                <p className="text-xs text-muted-foreground pl-1">
+                                                    {currentTypeInfo.desc}
+                                                </p>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Edge Node Regions */}
-                                {edgeNodes.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Probe Regions
-                                            <span className="text-xs text-muted-foreground ml-2 font-normal">Select which edge nodes should check this monitor</span>
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {edgeNodes.map((node) => (
-                                                <label key={node.id} className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${selectedRegions.includes(node.id) ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedRegions.includes(node.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedRegions([...selectedRegions, node.id]);
-                                                            } else {
-                                                                setSelectedRegions(selectedRegions.filter(r => r !== node.id));
-                                                            }
-                                                        }}
-                                                        className="accent-primary"
-                                                    />
-                                                    <div>
-                                                        <div className="text-sm font-medium">{node.name || node.id}</div>
-                                                        <div className="text-xs text-muted-foreground">{node.id}</div>
-                                                    </div>
+                                        {/* Name */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Display Name</label>
+                                            <Input
+                                                placeholder="My Minecraft Server"
+                                                value={newMonitor.name}
+                                                onChange={(e) => setNewMonitor({ ...newMonitor, name: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+
+                                        {/* Target — hidden for HEARTBEAT */}
+                                        {!isHeartbeatType && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">
+                                                    {selectedType === "DNS" ? "Domain" :
+                                                        selectedType === "STEAM" || selectedType === "PORT" ? "IP Address / Host" :
+                                                            selectedType === "SSL" ? "Domain (without https://)" :
+                                                                selectedType === "SMTP" ? "Mail Server Host" :
+                                                                    selectedType === "DISCORD" ? "Discord Bot User ID" :
+                                                                        "Target URL / Host"}
                                                 </label>
-                                            ))}
-                                        </div>
-                                        {selectedRegions.length === 0 && (
-                                            <p className="text-xs text-amber-500">⚠ No region selected — monitor will run locally only.</p>
+                                                <Input
+                                                    placeholder={currentTypeInfo?.placeholder ?? "https://example.com"}
+                                                    value={newMonitor.target}
+                                                    onChange={(e) => setNewMonitor({ ...newMonitor, target: e.target.value })}
+                                                    required={!isHeartbeatType}
+                                                />
+                                            </div>
                                         )}
-                                    </div>
-                                )}
 
-                                {/* Parent Monitor (Dependency) */}
-                                {monitors.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Parent Monitor <span className="text-xs text-muted-foreground ml-1 font-normal">(Optional — for dependency detection)</span>
-                                        </label>
-                                        <Select
-                                            value={newMonitor.parentMonitorId}
-                                            onValueChange={(val) => setNewMonitor({ ...newMonitor, parentMonitorId: val === "none" ? "" : val })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="No parent (standalone)" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">No parent (standalone)</SelectItem>
-                                                {monitors.map((m) => (
-                                                    <SelectItem key={m.id} value={m.id}>{m.name} ({m.type})</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-muted-foreground">If this monitor&apos;s parent is OFFLINE, its alerts will be automatically suppressed.</p>
-                                    </div>
-                                )}
+                                        {/* Heartbeat info box */}
+                                        {isHeartbeatType && (
+                                            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-400 space-y-1">
+                                                <p className="font-medium">🫀 How Heartbeat Monitors Work</p>
+                                                <p>After creation, Pulse generates a unique URL for this monitor. Your cron job, script, or service pings that URL periodically. If no ping is received within <strong>1.5× the check interval</strong>, the monitor goes OFFLINE and an alert is triggered.</p>
+                                                <p className="text-muted-foreground">The ping URL will be shown after saving.</p>
+                                            </div>
+                                        )}
 
-                                <Button type="submit" className="w-full">
+                                        {/* Port */}
+                                        {showPort && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Port</label>
+                                                <Input
+                                                    type="number"
+                                                    value={newMonitor.port}
+                                                    onChange={(e) => setNewMonitor({ ...newMonitor, port: e.target.value })}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Keyword */}
+                                        {showKeyword && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Keyword to find</label>
+                                                <Input
+                                                    placeholder="Online"
+                                                    value={newMonitor.keyword}
+                                                    onChange={(e) => setNewMonitor({ ...newMonitor, keyword: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Interval</label>
+                                                <Select
+                                                    value={newMonitor.interval}
+                                                    onValueChange={(val) => setNewMonitor({ ...newMonitor, interval: val })}
+                                                >
+                                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="60">1 min</SelectItem>
+                                                        <SelectItem value="300">5 min</SelectItem>
+                                                        <SelectItem value="600">10 min</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Tags</label>
+                                                <Input
+                                                    placeholder="prod, api"
+                                                    value={newMonitor.tags}
+                                                    onChange={(e) => setNewMonitor({ ...newMonitor, tags: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="automation" className="space-y-4 mt-4">
+                                        <SelfHealingTutorial />
+
+                                        <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-muted/30">
+                                            <div className="space-y-0.5">
+                                                <label className="text-sm font-bold flex items-center gap-2">
+                                                    <Zap className="h-3.5 w-3.5 text-primary" />
+                                                    Enable Self-Healing
+                                                </label>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Trigger a webhook automatically when this monitor goes OFFLINE.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                checked={newMonitor.recoveryEnabled}
+                                                onCheckedChange={(checked) => setNewMonitor({ ...newMonitor, recoveryEnabled: checked })}
+                                            />
+                                        </div>
+
+                                        {newMonitor.recoveryEnabled && (
+                                            <div className="space-y-3 p-3 border rounded-lg bg-background animate-in fade-in slide-in-from-top-2">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-medium">Recovery Webhook URL</label>
+                                                    <Input
+                                                        placeholder="https://api.render.com/deploy/..."
+                                                        value={newMonitor.recoveryWebhookUrl}
+                                                        onChange={(e) => setNewMonitor({ ...newMonitor, recoveryWebhookUrl: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-medium">Method</label>
+                                                        <Select
+                                                            value={newMonitor.recoveryWebhookMethod}
+                                                            onValueChange={(val) => setNewMonitor({ ...newMonitor, recoveryWebhookMethod: val })}
+                                                        >
+                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="POST">POST</SelectItem>
+                                                                <SelectItem value="GET">GET</SelectItem>
+                                                                <SelectItem value="PUT">PUT</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-medium">Delay (seconds)</label>
+                                                        <Input
+                                                            type="number"
+                                                            className="h-8 text-xs"
+                                                            placeholder="0"
+                                                            value={newMonitor.recoveryInterval}
+                                                            onChange={(e) => setNewMonitor({ ...newMonitor, recoveryInterval: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-medium">Custom JSON Body (Optional)</label>
+                                                    <Input
+                                                        placeholder='{"action": "restart"}'
+                                                        className="font-mono text-[10px]"
+                                                        value={newMonitor.recoveryWebhookBody}
+                                                        onChange={(e) => setNewMonitor({ ...newMonitor, recoveryWebhookBody: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </TabsContent>
+                                </Tabs>
+
+                                <Button type="submit" className="w-full mt-4">
                                     <Zap className="mr-2 h-4 w-4" />
                                     Create Monitor
                                 </Button>
@@ -1043,309 +1059,197 @@ export default function MonitorsPage() {
                         <DialogTitle>Edit Monitor — {editMonitor?.name}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Display Name</label>
-                            <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Target URL / Host</label>
-                            <Input value={editForm.target} onChange={(e) => setEditForm({ ...editForm, target: e.target.value })} required />
-                        </div>
-                        {editMonitor?.port !== null && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Port</label>
-                                <Input type="number" value={editForm.port} onChange={(e) => setEditForm({ ...editForm, port: e.target.value })} />
-                            </div>
-                        )}
-                        {editMonitor?.type === "KEYWORD" && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Keyword</label>
-                                <Input value={editForm.keyword} onChange={(e) => setEditForm({ ...editForm, keyword: e.target.value })} />
-                            </div>
-                        )}
+                        <Tabs defaultValue="general" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="general">General Settings</TabsTrigger>
+                                <TabsTrigger value="automation">Automation & Healing</TabsTrigger>
+                            </TabsList>
 
-                        {selectedType === "FLOW" && (
-                            <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                                        <Zap className="h-4 w-4 text-yellow-500" />
-                                        Flow Steps
-                                    </h4>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                            steps.push({ method: "GET", url: "", expectedCode: "200" });
-                                            setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                        }}
-                                    >
-                                        Add Step
-                                    </Button>
+                            <TabsContent value="general" className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Display Name</label>
+                                    <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
                                 </div>
-                                <div className="space-y-3">
-                                    {JSON.parse(newMonitor.flowSteps || "[]").map((step: any, idx: number) => (
-                                        <div key={idx} className="p-3 border rounded-md bg-background space-y-3 relative group">
-                                            <button
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Target URL / Host</label>
+                                    <Input value={editForm.target} onChange={(e) => setEditForm({ ...editForm, target: e.target.value })} required />
+                                </div>
+                                {editMonitor?.port !== null && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Port</label>
+                                        <Input type="number" value={editForm.port} onChange={(e) => setEditForm({ ...editForm, port: e.target.value })} />
+                                    </div>
+                                )}
+                                {editMonitor?.type === "KEYWORD" && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Keyword to find</label>
+                                        <Input value={editForm.keyword} onChange={(e) => setEditForm({ ...editForm, keyword: e.target.value })} />
+                                    </div>
+                                )}
+
+                                {editMonitor?.type === "FLOW" && (
+                                    <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-sm font-semibold flex items-center gap-2 text-yellow-500">
+                                                <Zap className="h-4 w-4" />
+                                                Flow Steps
+                                            </h4>
+                                            <Button
                                                 type="button"
-                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
-                                                onClick={() => {
-                                                    const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                    steps.splice(idx, 1);
-                                                    setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                <Select
-                                                    value={step.method || "GET"}
-                                                    onValueChange={(val) => {
-                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                        steps[idx].method = val;
-                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="GET">GET</SelectItem>
-                                                        <SelectItem value="POST">POST</SelectItem>
-                                                        <SelectItem value="PUT">PUT</SelectItem>
-                                                        <SelectItem value="DELETE">DELETE</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <Input
-                                                    className="col-span-3 h-8"
-                                                    placeholder="URL (e.g. /api/health)"
-                                                    value={step.url}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                        steps[idx].url = e.target.value;
-                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="Expected HTTP Code"
-                                                    value={step.expectedCode}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                        steps[idx].expectedCode = e.target.value;
-                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="Expected Keyword"
-                                                    value={step.expectedBody}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                        steps[idx].expectedBody = e.target.value;
-                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                            </div>
-                                            {(step.method === "POST" || step.method === "PUT") && (
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="JSON Body (optional)"
-                                                    value={step.body || ""}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(newMonitor.flowSteps || "[]");
-                                                        steps[idx].body = e.target.value;
-                                                        setNewMonitor({ ...newMonitor, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                    {JSON.parse(newMonitor.flowSteps || "[]").length === 0 && (
-                                        <p className="text-xs text-muted-foreground text-center py-4 italic">No steps defined. Add one to start.</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {editMonitor?.type === "FLOW" && (
-                            <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                                        <Zap className="h-4 w-4 text-yellow-500" />
-                                        Flow Steps
-                                    </h4>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            const steps = JSON.parse(editForm.flowSteps || "[]");
-                                            steps.push({ method: "GET", url: "", expectedCode: "200" });
-                                            setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                        }}
-                                    >
-                                        Add Step
-                                    </Button>
-                                </div>
-                                <div className="space-y-3">
-                                    {JSON.parse(editForm.flowSteps || "[]").map((step: any, idx: number) => (
-                                        <div key={idx} className="p-3 border rounded-md bg-background space-y-3 relative group">
-                                            <button
-                                                type="button"
-                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                                                size="sm"
+                                                variant="outline"
                                                 onClick={() => {
                                                     const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                    steps.splice(idx, 1);
+                                                    steps.push({ method: "GET", url: "", expectedCode: "200" });
                                                     setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
                                                 }}
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                            <div className="grid grid-cols-4 gap-2">
+                                                Add Step
+                                            </Button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {JSON.parse(editForm.flowSteps || "[]").map((step: any, idx: number) => (
+                                                <div key={idx} className="p-3 border rounded-md bg-background space-y-3 relative group">
+                                                    <button
+                                                        type="button"
+                                                        className="absolute top-2 right-2 text-destructive"
+                                                        onClick={() => {
+                                                            const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                            steps.splice(idx, 1);
+                                                            setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        <Select
+                                                            value={step.method || "GET"}
+                                                            onValueChange={(val) => {
+                                                                const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                                steps[idx].method = val;
+                                                                setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="GET">GET</SelectItem>
+                                                                <SelectItem value="POST">POST</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Input
+                                                            className="col-span-3 h-8"
+                                                            placeholder="/api/health"
+                                                            value={step.url}
+                                                            onChange={(e) => {
+                                                                const steps = JSON.parse(editForm.flowSteps || "[]");
+                                                                steps[idx].url = e.target.value;
+                                                                setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Interval</label>
+                                        <Select value={editForm.interval} onValueChange={(val) => setEditForm({ ...editForm, interval: val })}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="60">1 min</SelectItem>
+                                                <SelectItem value="300">5 min</SelectItem>
+                                                <SelectItem value="600">10 min</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Tags</label>
+                                        <Input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="prod, api" />
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="automation" className="space-y-4 mt-4">
+                                <SelfHealingTutorial />
+
+                                <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-muted/30">
+                                    <div className="space-y-0.5">
+                                        <label className="text-sm font-bold flex items-center gap-2">
+                                            <Zap className="h-3.5 w-3.5 text-primary" />
+                                            Enable Self-Healing
+                                        </label>
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Automatically trigger a recovery webhook when OFFLINE.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={editForm.recoveryEnabled}
+                                        onCheckedChange={(checked) => setEditForm({ ...editForm, recoveryEnabled: checked })}
+                                    />
+                                </div>
+
+                                {editForm.recoveryEnabled && (
+                                    <div className="space-y-3 p-3 border rounded-lg bg-background animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-medium">Recovery Webhook URL</label>
+                                            <Input
+                                                placeholder="https://api.render.com/deploy/..."
+                                                value={editForm.recoveryWebhookUrl}
+                                                onChange={(e) => setEditForm({ ...editForm, recoveryWebhookUrl: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium">Method</label>
                                                 <Select
-                                                    value={step.method || "GET"}
-                                                    onValueChange={(val) => {
-                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                        steps[idx].method = val;
-                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                                    }}
+                                                    value={editForm.recoveryWebhookMethod}
+                                                    onValueChange={(val) => setEditForm({ ...editForm, recoveryWebhookMethod: val })}
                                                 >
-                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="GET">GET</SelectItem>
                                                         <SelectItem value="POST">POST</SelectItem>
+                                                        <SelectItem value="GET">GET</SelectItem>
                                                         <SelectItem value="PUT">PUT</SelectItem>
-                                                        <SelectItem value="DELETE">DELETE</SelectItem>
                                                     </SelectContent>
                                                 </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium">Delay (seconds)</label>
                                                 <Input
-                                                    className="col-span-3 h-8"
-                                                    placeholder="URL (e.g. /api/health)"
-                                                    value={step.url}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                        steps[idx].url = e.target.value;
-                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                                    }}
+                                                    type="number"
+                                                    className="h-8 text-xs"
+                                                    placeholder="0"
+                                                    value={editForm.recoveryInterval}
+                                                    onChange={(e) => setEditForm({ ...editForm, recoveryInterval: e.target.value })}
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="Expected HTTP Code"
-                                                    value={step.expectedCode}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                        steps[idx].expectedCode = e.target.value;
-                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="Expected Keyword"
-                                                    value={step.expectedBody}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                        steps[idx].expectedBody = e.target.value;
-                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                            </div>
-                                            {(step.method === "POST" || step.method === "PUT") && (
-                                                <Input
-                                                    className="h-8"
-                                                    placeholder="JSON Body (optional)"
-                                                    value={step.body || ""}
-                                                    onChange={(e) => {
-                                                        const steps = JSON.parse(editForm.flowSteps || "[]");
-                                                        steps[idx].body = e.target.value;
-                                                        setEditForm({ ...editForm, flowSteps: JSON.stringify(steps) });
-                                                    }}
-                                                />
-                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Max Response Time (ms)</label>
-                                <Input type="number" placeholder="1000" value={editForm.maxResponseTime} onChange={(e) => setEditForm({ ...editForm, maxResponseTime: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Custom Webhook</label>
-                                <Input type="url" placeholder="https://..." value={editForm.customWebhook} onChange={(e) => setEditForm({ ...editForm, customWebhook: e.target.value })} />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Probe Regions <span className="text-xs text-muted-foreground font-normal">(comma-separated node IDs)</span></label>
-                            <Input value={editForm.regions} onChange={(e) => setEditForm({ ...editForm, regions: e.target.value })} placeholder="eu-central,us-east" />
-                            {edgeNodes.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 pt-1">
-                                    {edgeNodes.map(node => (
-                                        <button key={node.id} type="button"
-                                            onClick={() => {
-                                                const current = editForm.regions.split(",").map(s => s.trim()).filter(Boolean);
-                                                const next = current.includes(node.id)
-                                                    ? current.filter(r => r !== node.id)
-                                                    : [...current, node.id];
-                                                setEditForm({ ...editForm, regions: next.join(",") });
-                                            }}
-                                            className={`text-xs px-2 py-1 rounded-full border transition-colors ${editForm.regions.split(",").map(s => s.trim()).includes(node.id)
-                                                ? "bg-primary text-primary-foreground border-primary"
-                                                : "bg-background border-border hover:bg-muted"
-                                                }`}>
-                                            {node.name || node.id}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Tags <span className="text-xs text-muted-foreground ml-1">(comma-separated)</span></label>
-                            <Input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="prod, backend" />
-                            {allUniqueTags.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 pt-1">
-                                    {allUniqueTags.map(tag => (
-                                        <button
-                                            key={tag}
-                                            type="button"
-                                            onClick={() => setEditForm({ ...editForm, tags: toggleTagInString(editForm.tags, tag) })}
-                                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${editForm.tags.split(",").map(s => s.trim()).includes(tag)
-                                                ? "bg-primary text-primary-foreground border-primary"
-                                                : "bg-background border-border hover:bg-muted"
-                                                }`}
-                                        >
-                                            {tag}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Check Interval</label>
-                            <Select value={editForm.interval} onValueChange={(val) => setEditForm({ ...editForm, interval: val })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="60">Every 1 minute</SelectItem>
-                                    <SelectItem value="300">Every 5 minutes</SelectItem>
-                                    <SelectItem value="600">Every 10 minutes</SelectItem>
-                                    <SelectItem value="1800">Every 30 minutes</SelectItem>
-                                    <SelectItem value="3600">Every hour</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex gap-2 pt-2">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-medium">Custom JSON Body (Optional)</label>
+                                            <Input
+                                                placeholder='{"action": "restart"}'
+                                                className="font-mono text-[10px]"
+                                                value={editForm.recoveryWebhookBody}
+                                                onChange={(e) => setEditForm({ ...editForm, recoveryWebhookBody: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </TabsContent>
+                        </Tabs>
+
+                        <div className="flex gap-2 pt-4 border-t">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setEditMonitor(null)}>Cancel</Button>
                             <Button type="submit" className="flex-1" disabled={isEditSaving}>
                                 {isEditSaving ? "Saving..." : "Save Changes"}
                             </Button>
                         </div>
-                    </form >
-                </DialogContent >
-            </Dialog >
-        </div >
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }

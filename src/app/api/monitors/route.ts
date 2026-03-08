@@ -51,6 +51,11 @@ export async function POST(req: Request) {
                 parentMonitorId: data.parentMonitorId || null,
                 tags: data.tags || null,
                 flowSteps: data.flowSteps || null,
+                recoveryEnabled: data.recoveryEnabled || false,
+                recoveryWebhookUrl: data.recoveryWebhookUrl || null,
+                recoveryWebhookMethod: data.recoveryWebhookMethod || "POST",
+                recoveryWebhookBody: data.recoveryWebhookBody || null,
+                recoveryInterval: parseInt(data.recoveryInterval) || 0,
             },
         });
 

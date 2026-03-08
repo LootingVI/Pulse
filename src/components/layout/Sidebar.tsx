@@ -14,6 +14,7 @@ import {
     FolderTree,
     CalendarClock,
     BarChart2,
+    Zap,
 } from "lucide-react";
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
     { name: "Status Pages", href: "/dashboard/status-pages", icon: Globe },
     { name: "Incidents", href: "/dashboard/incidents", icon: Bell },
     { name: "Infrastructure", href: "/dashboard/topology", icon: FolderTree },
+    { name: "3D Nerve System", href: "/dashboard/3d-map", icon: Zap },
     { name: "Maintenance", href: "/dashboard/maintenance", icon: CalendarClock },
     { name: "Reports", href: "/dashboard/reports", icon: BarChart2, role: "ADMIN" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },

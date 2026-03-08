@@ -99,6 +99,13 @@ model Monitor {
   parentMonitor   Monitor?      @relation("MonitorDependency", fields: [parentMonitorId], references: [id], onDelete: SetNull)
   childMonitors   Monitor[]     @relation("MonitorDependency")
   
+  // Self-Healing (Feature 4)
+  recoveryEnabled       Boolean @default(false)
+  recoveryWebhookUrl    String?
+  recoveryWebhookMethod String? @default("POST")
+  recoveryWebhookBody   String? // JSON string
+  recoveryInterval      Int     @default(0) // seconds to wait before firing
+  recoveryRetries       Int     @default(1) // how many times to retry remediation
   // Timestamps
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
