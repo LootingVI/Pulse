@@ -99,7 +99,6 @@ function MonitorNode({ monitor, position, onClick }: NodeProps) {
                     position={[0, 0.9, 0]}
                     fontSize={0.25}
                     color="white"
-                    font="/fonts/Inter-Bold.woff" // Assuming Inter is available or fallback
                     anchorX="center"
                     anchorY="middle"
                     outlineWidth={0.03}
