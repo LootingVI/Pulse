@@ -1,9 +1,16 @@
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, AlertCircle, ShieldCheck, Globe } from "lucide-react";
+import { CheckCircle2, AlertCircle, ShieldCheck, Globe, ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CopyBadgeButton } from "@/components/copy-badge-button";
+
+interface CustomButton {
+    label: string;
+    url: string;
+    color?: string;
+}
+
 export default async function PublicStatusPage({
     params,
 }: {
@@ -40,9 +47,13 @@ export default async function PublicStatusPage({
         notFound();
     }
 
-    const allOperational = statusPage.monitors.every(
-        (m) => m.status === "ONLINE"
-    );
+    const allOperational = statusPage.monitors.every((m) => m.status === "ONLINE");
+
+    // Parse custom buttons from config
+    let customButtons: CustomButton[] = [];
+    try {
+        if (statusPage.config) customButtons = JSON.parse(statusPage.config);
+    } catch { }
 
     // Collect all incidents across all monitors (unresolved first)
     const allIncidents = statusPage.monitors
@@ -63,15 +74,47 @@ export default async function PublicStatusPage({
             <div className="max-w-4xl mx-auto py-12 px-4">
                 {/* Header */}
                 <div className="flex flex-col items-center mb-12 text-center">
-                    <div className="bg-primary p-3 rounded-2xl mb-4">
-                        <ShieldCheck className="h-10 w-10 text-primary-foreground" />
-                    </div>
+                    {/* Logo or fallback icon */}
+                    {statusPage.logo ? (
+                        <img
+                            src={statusPage.logo}
+                            alt={statusPage.title}
+                            className="h-20 w-auto object-contain mb-4 rounded-xl"
+                        />
+                    ) : (
+                        <div className="bg-primary p-3 rounded-2xl mb-4">
+                            <ShieldCheck className="h-10 w-10 text-primary-foreground" />
+                        </div>
+                    )}
                     <h1 className="text-3xl font-extrabold tracking-tight">
                         {statusPage.title}
                     </h1>
                     <p className="text-muted-foreground mt-2">
                         {statusPage.description || "System Status & Incidents"}
                     </p>
+
+                    {/* Custom Buttons */}
+                    {customButtons.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-5 justify-center">
+                            {customButtons.map((btn, i) => (
+                                <a
+                                    key={i}
+                                    href={btn.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all hover:opacity-80"
+                                    style={{
+                                        borderColor: btn.color || "#3b82f6",
+                                        color: btn.color || "#3b82f6",
+                                        background: `${(btn.color || "#3b82f6")}15`,
+                                    }}
+                                >
+                                    <ExternalLink className="h-3 w-3" />
+                                    {btn.label}
+                                </a>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Global Status Banner */}
@@ -111,31 +154,25 @@ export default async function PublicStatusPage({
                         </Card>
                     ) : (
                         statusPage.monitors.map((monitor) => {
-                            // Build real uptime bar from last 90 results
                             const results = monitor.results;
                             const bars: (string | null)[] = Array.from(
                                 { length: 90 },
                                 (_, i) => results[i]?.status ?? null
-                            ).reverse(); // oldest → newest
+                            ).reverse();
 
                             const totalChecks = results.length;
-                            const upChecks = results.filter(
-                                (r) => r.status === "ONLINE"
-                            ).length;
+                            const upChecks = results.filter((r) => r.status === "ONLINE").length;
                             const uptimePct =
                                 totalChecks > 0
                                     ? ((upChecks / totalChecks) * 100).toFixed(2)
                                     : null;
 
-                            // --- Per-region stats ---
-                            // Get unique regions from the most recent results
                             const regionMap = new Map<string, { pings: number[]; status: string }>();
                             for (const r of results) {
                                 if (!r.region) continue;
                                 if (!regionMap.has(r.region)) {
                                     regionMap.set(r.region, { pings: [], status: r.status });
                                 }
-                                // Only collect from the first (latest) occurrence per region
                                 const entry = regionMap.get(r.region)!;
                                 if (entry.pings.length < 10 && r.status === "ONLINE") {
                                     entry.pings.push(r.responseTime);
@@ -145,9 +182,10 @@ export default async function PublicStatusPage({
                             const regionStats = Array.from(regionMap.entries()).map(([region, data]) => ({
                                 region,
                                 status: data.status,
-                                avgPing: data.pings.length > 0
-                                    ? Math.round(data.pings.reduce((a, b) => a + b, 0) / data.pings.length)
-                                    : null,
+                                avgPing:
+                                    data.pings.length > 0
+                                        ? Math.round(data.pings.reduce((a, b) => a + b, 0) / data.pings.length)
+                                        : null,
                             }));
 
                             const hasRegions = regionStats.length > 1;
@@ -177,9 +215,7 @@ export default async function PublicStatusPage({
                                                             : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                                                     )}
                                                 >
-                                                    {monitor.status === "ONLINE"
-                                                        ? "Operational"
-                                                        : "Offline"}
+                                                    {monitor.status === "ONLINE" ? "Operational" : "Offline"}
                                                 </span>
                                             </div>
                                         </div>
@@ -211,9 +247,7 @@ export default async function PublicStatusPage({
                                             <span>90 checks ago</span>
                                             <div className="h-px bg-muted flex-1 mx-4 self-center" />
                                             <span>
-                                                {uptimePct !== null
-                                                    ? `${uptimePct}% uptime`
-                                                    : "No data yet"}
+                                                {uptimePct !== null ? `${uptimePct}% uptime` : "No data yet"}
                                             </span>
                                             <div className="h-px bg-muted flex-1 mx-4 self-center" />
                                             <span>Now</span>
@@ -238,19 +272,29 @@ export default async function PublicStatusPage({
                                                             )}
                                                         >
                                                             <div className="flex items-center gap-2">
-                                                                <div className={cn(
-                                                                    "h-1.5 w-1.5 rounded-full shrink-0",
-                                                                    node.status === "ONLINE" ? "bg-green-500" : "bg-red-500"
-                                                                )} />
-                                                                <span className="font-medium text-foreground truncate max-w-[80px]">{node.region}</span>
+                                                                <div
+                                                                    className={cn(
+                                                                        "h-1.5 w-1.5 rounded-full shrink-0",
+                                                                        node.status === "ONLINE" ? "bg-green-500" : "bg-red-500"
+                                                                    )}
+                                                                />
+                                                                <span className="font-medium text-foreground truncate max-w-[80px]">
+                                                                    {node.region}
+                                                                </span>
                                                             </div>
-                                                            <span className={cn(
-                                                                "font-mono tabular-nums",
-                                                                node.status === "ONLINE" ? "text-green-600 dark:text-green-400" : "text-red-500"
-                                                            )}>
+                                                            <span
+                                                                className={cn(
+                                                                    "font-mono tabular-nums",
+                                                                    node.status === "ONLINE"
+                                                                        ? "text-green-600 dark:text-green-400"
+                                                                        : "text-red-500"
+                                                                )}
+                                                            >
                                                                 {node.status === "ONLINE" && node.avgPing !== null
                                                                     ? `${node.avgPing}ms`
-                                                                    : node.status === "OFFLINE" ? "Down" : "—"}
+                                                                    : node.status === "OFFLINE"
+                                                                        ? "Down"
+                                                                        : "—"}
                                                             </span>
                                                         </div>
                                                     ))}
@@ -344,9 +388,7 @@ export default async function PublicStatusPage({
                 {/* Footer */}
                 <div className="mt-24 pt-8 border-t text-center text-sm text-muted-foreground">
                     <p>Powered by Pulse</p>
-                    <p className="text-xs mt-1">
-                        Updated {new Date().toLocaleString()}
-                    </p>
+                    <p className="text-xs mt-1">Updated {new Date().toLocaleString()}</p>
                 </div>
             </div>
         </div>

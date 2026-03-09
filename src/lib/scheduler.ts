@@ -102,11 +102,7 @@ async function runCheck(monitorId: string) {
 
     const previousStatus = monitor.status;
 
-    if (result.status === "OFFLINE" && previousStatus === "ONLINE" && monitor.recoveryEnabled) {
-        // Fire & Forget recovery trigger
-        triggerRecovery(monitor);
-    }
-
+    // Update status FIRST so cascade and recovery logic sees the correct state
     await prisma.monitor.update({
         where: { id: monitorId },
         data: {
@@ -114,6 +110,11 @@ async function runCheck(monitorId: string) {
             lastChecked: new Date(),
         },
     });
+
+    // Fire & Forget self-healing recovery (only on ONLINE → OFFLINE transition)
+    if (result.status === "OFFLINE" && previousStatus === "ONLINE" && monitor.recoveryEnabled) {
+        triggerRecovery(monitor);
+    }
 
     const regionsList = monitor.regions ? monitor.regions.split(",").map((r: string) => r.trim()).filter(Boolean) : ["eu-central"];
 

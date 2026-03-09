@@ -23,6 +23,8 @@ export async function PATCH(
         data: {
             title: data.title,
             description: data.description ?? null,
+            logo: data.logo ?? null,
+            config: data.customButtons ? JSON.stringify(data.customButtons) : null,
             monitors: data.monitorIds !== undefined
                 ? {
                     set: data.monitorIds.map((mid: string) => ({ id: mid })),

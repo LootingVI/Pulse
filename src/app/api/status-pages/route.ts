@@ -41,6 +41,8 @@ export async function POST(req: Request) {
                 slug: data.slug,
                 title: data.title,
                 description: data.description || null,
+                logo: data.logo || null,
+                config: data.customButtons ? JSON.stringify(data.customButtons) : null,
                 userId,
                 monitors: data.monitorIds?.length
                     ? { connect: data.monitorIds.map((id: string) => ({ id })) }

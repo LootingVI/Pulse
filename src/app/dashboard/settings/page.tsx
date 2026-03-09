@@ -40,20 +40,21 @@ export default function SettingsPage() {
         const fetchSettings = async () => {
             const res = await fetch("/api/settings");
             const data = await res.json();
-            if (data.discordWebhook) setDiscordWebhook(data.discordWebhook);
-            if (data.notifyDown) setNotifyDown(data.notifyDown === "true");
-            if (data.notifyUp) setNotifyUp(data.notifyUp === "true");
-            if (data.smtpHost) setSmtpHost(data.smtpHost);
-            if (data.smtpPort) setSmtpPort(data.smtpPort);
-            if (data.smtpUser) setSmtpUser(data.smtpUser);
-            if (data.smtpPass) setSmtpPass(data.smtpPass);
-            if (data.smtpFrom) setSmtpFrom(data.smtpFrom);
+            if (data.discordWebhook !== undefined) setDiscordWebhook(data.discordWebhook);
+            if (data.notifyDown !== undefined) setNotifyDown(data.notifyDown === "true");
+            if (data.notifyUp !== undefined) setNotifyUp(data.notifyUp === "true");
+            if (data.smtpHost !== undefined) setSmtpHost(data.smtpHost);
+            if (data.smtpPort !== undefined) setSmtpPort(data.smtpPort);
+            if (data.smtpUser !== undefined) setSmtpUser(data.smtpUser);
+            if (data.smtpPass !== undefined) setSmtpPass(data.smtpPass);
+            if (data.smtpFrom !== undefined) setSmtpFrom(data.smtpFrom);
             if (data.edgeNodes) {
                 try {
                     setEdgeNodes(JSON.parse(data.edgeNodes));
                 } catch { }
             }
-            if (data.cascadeEnabled) setCascadeEnabled(data.cascadeEnabled === "true");
+            // Always set cascade values when present in DB (even if "false")
+            setCascadeEnabled(data.cascadeEnabled === "true");
             if (data.cascadeThreshold) setCascadeThreshold(data.cascadeThreshold);
             if (data.cascadeWindow) setCascadeWindow(data.cascadeWindow);
         };
@@ -259,6 +260,10 @@ export default function SettingsPage() {
                             <p>You can also assign a <strong>Parent Monitor</strong> to individual monitors (e.g. "Database" is the parent of "API Server"). If the parent goes OFFLINE, child alerts are automatically suppressed — configured per monitor in the Monitors page.</p>
                         </div>
                     </div>
+                    <Button onClick={saveSettings} disabled={isSaving}>
+                        <Save className="mr-2 h-4 w-4" />
+                        {isSaving ? "Saving..." : "Save Cascade Settings"}
+                    </Button>
                 </CardContent>
             </Card>
             <Card>
