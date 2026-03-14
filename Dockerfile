@@ -1,39 +1,42 @@
+# --- Stage 1: Build ---
 FROM node:20-alpine AS builder
-
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package*.json ./
-# Install dependencies including devDeps needed for build
 RUN npm ci
 
 COPY . .
-
-# Generate Prisma Client
 RUN npx prisma generate
-
-# Build the Next.js app
-# Disabling telemetry
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
-# Production image
+# --- Stage 2: Runner ---
 FROM node:20-alpine AS runner
-
 WORKDIR /app
+
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-COPY --from=builder /app/next.config.ts ./
+# Erstelle User für Sicherheit
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Kopiere optimierten Standalone-Build
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 
-# Make sure the data directory exists
-RUN mkdir -p /app/prisma/data
+# Datenbank-Verzeichnis vorbereiten
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
+USER nextjs
 
 EXPOSE 3000
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
 
-# Run db push then start the app
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm start"]
+# Starte den optimierten Server.js (Next.js Standalone)
+# Wir führen prisma db push beim Start aus, um die DB-Struktur sicherzustellen
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]

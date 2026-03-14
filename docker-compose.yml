@@ -8,11 +8,17 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - pulse_data:/app/prisma/data
+      - pulse_data:/app/data
     environment:
-      - DATABASE_URL=file:/app/prisma/data/pulse.db
+      - DATABASE_URL=file:/app/data/pulse.db
       - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
+      - NEXTAUTH_SECRET=generate-a-long-random-string-here
+      # Optional: Healthcheck für automatische Restarts bei Fehlern
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   pulse_data:

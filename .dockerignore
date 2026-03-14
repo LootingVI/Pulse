@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.prisma/data
+*.db
+*.db-journal
+*.log
+README.md
+.env.local
+.vscode
