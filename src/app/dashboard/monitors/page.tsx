@@ -25,6 +25,7 @@ import {
     Heart,
     Tag,
     X,
+    FolderTree,
 } from "lucide-react";
 import {
     Table,
@@ -183,6 +184,7 @@ export default function MonitorsPage() {
         regions: "",
         tags: "",
         flowSteps: "",
+        parentMonitorId: "",
         recoveryEnabled: false,
         recoveryWebhookUrl: "",
         recoveryWebhookMethod: "POST",
@@ -396,6 +398,7 @@ export default function MonitorsPage() {
             recoveryWebhookMethod: monitor.recoveryWebhookMethod || "POST",
             recoveryWebhookBody: monitor.recoveryWebhookBody || "",
             recoveryInterval: String(monitor.recoveryInterval || 0),
+            parentMonitorId: monitor.parentMonitorId || "",
         });
     };
 
@@ -416,6 +419,7 @@ export default function MonitorsPage() {
             if (editForm.regions) payload.regions = editForm.regions;
             payload.tags = editForm.tags;
             payload.flowSteps = editForm.flowSteps;
+            payload.parentMonitorId = editForm.parentMonitorId || null;
 
             // Self-Healing Payload (Edit)
             payload.recoveryEnabled = editForm.recoveryEnabled;
@@ -597,7 +601,8 @@ export default function MonitorsPage() {
                                 <Tabs defaultValue="general" className="w-full">
                                     <TabsList className="grid w-full grid-cols-2">
                                         <TabsTrigger value="general">General</TabsTrigger>
-                                        <TabsTrigger value="automation">Automation & Healing</TabsTrigger>
+                                        <TabsTrigger value="automation">Automation</TabsTrigger>
+                                        <TabsTrigger value="advanced">Advanced</TabsTrigger>
                                     </TabsList>
 
                                     <TabsContent value="general" className="space-y-4 mt-4">
@@ -788,6 +793,65 @@ export default function MonitorsPage() {
                                                 </div>
                                             </div>
                                         )}
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="advanced" className="space-y-4 mt-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <FolderTree className="h-4 w-4 text-primary" />
+                                                Parent Monitor (Dependency)
+                                            </label>
+                                            <p className="text-[10px] text-muted-foreground mb-2">
+                                                If the parent monitor is DOWN, alerts for this monitor will be suppressed (Cascade Detection).
+                                            </p>
+                                            <Select 
+                                                value={newMonitor.parentMonitorId} 
+                                                onValueChange={(val) => setNewMonitor({ ...newMonitor, parentMonitorId: val })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="None (Standalone)" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">None (Standalone)</SelectItem>
+                                                    {monitors.map(m => (
+                                                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <Globe className="h-4 w-4 text-primary" />
+                                                Edge Regions
+                                            </label>
+                                            <p className="text-[10px] text-muted-foreground mb-2">
+                                                Select which edge nodes should also check this monitor.
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {edgeNodes.map(node => (
+                                                    <Button
+                                                        key={node.id}
+                                                        type="button"
+                                                        variant={selectedRegions.includes(node.id) ? "default" : "outline"}
+                                                        size="sm"
+                                                        className="h-7 text-[10px]"
+                                                        onClick={() => {
+                                                            if (selectedRegions.includes(node.id)) {
+                                                                setSelectedRegions(selectedRegions.filter(id => id !== node.id));
+                                                            } else {
+                                                                setSelectedRegions([...selectedRegions, node.id]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {node.name}
+                                                    </Button>
+                                                ))}
+                                                {edgeNodes.length === 0 && (
+                                                    <p className="text-[10px] italic text-muted-foreground">No edge nodes configured in Settings.</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </TabsContent>
                                 </Tabs>
 
@@ -1061,8 +1125,9 @@ export default function MonitorsPage() {
                     <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
                         <Tabs defaultValue="general" className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="general">General Settings</TabsTrigger>
-                                <TabsTrigger value="automation">Automation & Healing</TabsTrigger>
+                                <TabsTrigger value="general">General</TabsTrigger>
+                                <TabsTrigger value="automation">Automation</TabsTrigger>
+                                <TabsTrigger value="advanced">Advanced</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="general" className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -1238,6 +1303,40 @@ export default function MonitorsPage() {
                                         </div>
                                     </div>
                                 )}
+                            </TabsContent>
+
+                            <TabsContent value="advanced" className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <FolderTree className="h-4 w-4 text-primary" />
+                                        Parent Monitor (Dependency)
+                                    </label>
+                                    <Select 
+                                        value={editForm.parentMonitorId || "none"} 
+                                        onValueChange={(val) => setEditForm({ ...editForm, parentMonitorId: val === "none" ? "" : val })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="None (Standalone)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">None (Standalone)</SelectItem>
+                                            {monitors.filter(m => m.id !== editMonitor?.id).map(m => (
+                                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Globe className="h-4 w-4 text-primary" />
+                                        Regions (Comma separated)
+                                    </label>
+                                    <Input 
+                                        value={editForm.regions} 
+                                        onChange={(e) => setEditForm({ ...editForm, regions: e.target.value })} 
+                                        placeholder="eu-central, us-east"
+                                    />
+                                </div>
                             </TabsContent>
                         </Tabs>
 
