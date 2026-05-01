@@ -154,14 +154,15 @@ async function runCheck(monitorId: string) {
                         responseTime: data.responseTime,
                         region: region,
                     };
+                } else {
+                    return { monitorId, status: "OFFLINE", responseTime: 0, region: region };
                 }
             } catch (e) {
-                // Do nothing, fallback to local failure later
+                return { monitorId, status: "OFFLINE", responseTime: 0, region: region };
             }
         }
 
-        // Fallback or "Local" probe (uses the primary performCheck result)
-        // Note: For non-HTTP checks, edge probes are skipped, falling back to local.
+        // Only use local result for primary region or if no edge node is assigned
         return {
             monitorId,
             status: result.status,

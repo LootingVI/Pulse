@@ -71,6 +71,8 @@ export async function handleCascadeDetection(
         });
 
         const uniqueMonitors = new Set(recentOfflineIncidents.map((i: any) => i.monitorId));
+        // Add the current monitor to the set of unique failing monitors
+        uniqueMonitors.add(monitor.id);
 
         if (uniqueMonitors.size >= threshold) {
             // Check if a cascade incident already exists for this wave

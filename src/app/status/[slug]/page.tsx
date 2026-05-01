@@ -18,19 +18,28 @@ export default async function PublicStatusPage({
 }) {
     const { slug } = await params;
 
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    ninetyDaysAgo.setHours(0, 0, 0, 0);
+
     const statusPage = await prisma.statusPage.findUnique({
         where: { slug },
         include: {
             monitors: {
                 include: {
                     results: {
-                        take: 90,
+                        where: { timestamp: { gte: ninetyDaysAgo } },
                         orderBy: { timestamp: "desc" },
                         select: { status: true, timestamp: true, responseTime: true, region: true },
                     },
                     incidents: {
+                        where: {
+                            OR: [
+                                { createdAt: { gte: ninetyDaysAgo } },
+                                { updatedAt: { gte: ninetyDaysAgo }, status: "RESOLVED" }
+                            ]
+                        },
                         orderBy: { createdAt: "desc" },
-                        take: 10,
                         include: {
                             updates: {
                                 orderBy: { createdAt: "desc" },
@@ -155,10 +164,49 @@ export default async function PublicStatusPage({
                     ) : (
                         statusPage.monitors.map((monitor) => {
                             const results = monitor.results;
-                            const bars: (string | null)[] = Array.from(
-                                { length: 90 },
-                                (_, i) => results[i]?.status ?? null
-                            ).reverse();
+                            // Generate 90 days of bars
+                            const dailyStatus = Array.from({ length: 90 }, (_, i) => {
+                                const date = new Date();
+                                date.setDate(date.getDate() - (89 - i));
+                                date.setHours(0, 0, 0, 0);
+                                const nextDate = new Date(date);
+                                nextDate.setDate(date.getDate() + 1);
+
+                                // Find incidents overlapping this day to calculate downtime
+                                const dayIncidents = monitor.incidents.filter(inc => {
+                                    const start = new Date(inc.createdAt);
+                                    const end = inc.status === "RESOLVED" ? new Date(inc.updatedAt) : new Date();
+                                    return start < nextDate && end > date;
+                                });
+
+                                let downtimeMinutes = 0;
+                                dayIncidents.forEach(inc => {
+                                    const start = new Date(inc.createdAt);
+                                    const end = inc.status === "RESOLVED" ? new Date(inc.updatedAt) : new Date();
+                                    const overlapStart = Math.max(date.getTime(), start.getTime());
+                                    const overlapEnd = Math.min(nextDate.getTime(), end.getTime());
+                                    const duration = Math.max(0, overlapEnd - overlapStart);
+                                    downtimeMinutes += duration / 60000;
+                                });
+
+                                // Check if there's data for this day
+                                const dayResults = monitor.results.filter(r => {
+                                    const resDate = new Date(r.timestamp);
+                                    return resDate >= date && resDate < nextDate;
+                                });
+
+                                let status = "ONLINE";
+                                if (downtimeMinutes > 1430) status = "OFFLINE"; // Almost full day down
+                                else if (downtimeMinutes > 5) status = "DEGRADED"; // Some outage
+                                else if (dayResults.length === 0) status = "NODATA";
+                                else if (dayResults.some(r => r.status === "OFFLINE") || downtimeMinutes > 0) status = "DEGRADED";
+
+                                return {
+                                    date: date.toLocaleDateString(),
+                                    status,
+                                    downtime: Math.round(downtimeMinutes)
+                                };
+                            });
 
                             const totalChecks = results.length;
                             const upChecks = results.filter((r) => r.status === "ONLINE").length;
@@ -167,13 +215,16 @@ export default async function PublicStatusPage({
                                     ? ((upChecks / totalChecks) * 100).toFixed(2)
                                     : null;
 
+                            // ... rest of logic for regionStats ...
                             const regionMap = new Map<string, { pings: number[]; status: string }>();
-                            for (const r of results) {
-                                if (!r.region) continue;
-                                if (!regionMap.has(r.region)) {
-                                    regionMap.set(r.region, { pings: [], status: r.status });
+                            // We only take the last 100 results for region stats to avoid massive iterations
+                            for (const r of results.slice(0, 100)) {
+                                if (!(r as any).region) continue;
+                                const region = (r as any).region;
+                                if (!regionMap.has(region)) {
+                                    regionMap.set(region, { pings: [], status: r.status });
                                 }
-                                const entry = regionMap.get(r.region)!;
+                                const entry = regionMap.get(region)!;
                                 if (entry.pings.length < 10 && r.status === "ONLINE") {
                                     entry.pings.push(r.responseTime);
                                 }
@@ -191,7 +242,7 @@ export default async function PublicStatusPage({
                             const hasRegions = regionStats.length > 1;
 
                             return (
-                                <Card key={monitor.id} className="overflow-hidden border-muted">
+                                <Card key={monitor.id} className="overflow-hidden border-muted group/monitor">
                                     <CardContent className="p-5">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-3">
@@ -220,37 +271,38 @@ export default async function PublicStatusPage({
                                             </div>
                                         </div>
 
-                                        {/* Real uptime bar */}
-                                        <div className="flex gap-[2px] h-8">
-                                            {bars.map((status, i) => (
+                                        {/* 90 Days Uptime bar */}
+                                        <div className="flex gap-[2px] h-10 items-end">
+                                            {dailyStatus.map((day, i) => (
                                                 <div
                                                     key={i}
                                                     className={cn(
-                                                        "flex-1 rounded-sm",
-                                                        status === "ONLINE"
-                                                            ? "bg-green-500/80"
-                                                            : status === "OFFLINE"
-                                                                ? "bg-red-500/80"
-                                                                : "bg-muted"
+                                                        "flex-1 rounded-sm transition-all hover:scale-y-110 cursor-help relative group",
+                                                        day.status === "ONLINE"
+                                                            ? "bg-green-500/80 h-full"
+                                                            : day.status === "DEGRADED"
+                                                                ? "bg-orange-500/80 h-full"
+                                                                : day.status === "OFFLINE"
+                                                                    ? "bg-red-500/80 h-full"
+                                                                    : "bg-muted h-3"
                                                     )}
-                                                    title={
-                                                        status
-                                                            ? status === "ONLINE"
-                                                                ? "Operational"
-                                                                : "Offline"
-                                                            : "No data"
-                                                    }
-                                                />
+                                                >
+                                                    {/* Tooltip */}
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-zinc-800 transition-opacity">
+                                                        <div className="font-bold">{day.date}</div>
+                                                        <div>{day.status === "ONLINE" ? "100% Uptime" : day.status === "NODATA" ? "No Data" : `${day.downtime} min downtime`}</div>
+                                                    </div>
+                                                </div>
                                             ))}
                                         </div>
                                         <div className="flex justify-between mt-2 text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                                            <span>90 checks ago</span>
+                                            <span>90 days ago</span>
                                             <div className="h-px bg-muted flex-1 mx-4 self-center" />
                                             <span>
                                                 {uptimePct !== null ? `${uptimePct}% uptime` : "No data yet"}
                                             </span>
                                             <div className="h-px bg-muted flex-1 mx-4 self-center" />
-                                            <span>Now</span>
+                                            <span>Today</span>
                                         </div>
 
                                         {/* Per-Node / Region Stats */}

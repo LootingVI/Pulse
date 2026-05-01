@@ -42,7 +42,9 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
                     {navigation.map((item) => {
                         if (item.role && item.role !== userRole) return null;
 
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                        const isActive = item.href === "/dashboard" 
+                            ? pathname === "/dashboard" 
+                            : pathname === item.href || pathname.startsWith(item.href + "/");
 
                         return (
                             <Link
