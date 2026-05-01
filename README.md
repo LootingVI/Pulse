@@ -40,7 +40,9 @@
 - **Badge Generator** — Embed live status badges in any README or website
 - **Monitor Groups** — Organize monitors into logical groups
 - **User Management** — Admin panel with role-based access
-- **Docker Ready** — One-command deployment with Docker Compose
+- **NOC TV / Kiosk Mode** — A raw, high-contrast, distraction-free dashboard specifically designed for 24/7 display on office TVs.
+- **Advanced SSL Grading** — Deep certificates analysis providing grades (A+ down to F), issuer tracking, and early 14-day expiry warnings.
+- **Docker Ready** — One-command deployment with Docker Compose (Standalone Next.js mode for microscopic image sizes).
 
 ---
 

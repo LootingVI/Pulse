@@ -153,6 +153,7 @@ async function checkSSL(target: string, port: number = 443, timeoutMs: number): 
             { host: hostname, port: sslPort, servername: hostname, rejectUnauthorized: false },
             () => {
                 const cert = socket.getPeerCertificate();
+                const cipher = socket.getCipher();
                 const responseTime = Date.now() - start;
                 socket.destroy();
 
@@ -164,12 +165,23 @@ async function checkSSL(target: string, port: number = 443, timeoutMs: number): 
                 const now = new Date();
                 const daysLeft = Math.floor((expiry.getTime() - now.getTime()) / 86400000);
 
+                // Advanced Analysis: Grade based on protocol version
+                let grade = "C";
+                if (cipher.version === "TLSv1.3") grade = "A+";
+                else if (cipher.version === "TLSv1.2") grade = "A";
+                else if (cipher.version === "TLSv1.1" || cipher.version === "TLSv1.0") grade = "F";
+
+                const issuer = cert.issuer?.O || cert.issuer?.CN || "Unknown Issuer";
+                const messageBase = `Grade ${grade} · ${cipher.version} · ${issuer}`;
+
                 if (daysLeft < 0) {
-                    resolve({ status: 'OFFLINE', responseTime, message: `Certificate expired ${-daysLeft}d ago` });
+                    resolve({ status: 'OFFLINE', responseTime, message: `EXPIRED ${-daysLeft}d ago · ${messageBase}` });
                 } else if (daysLeft < 7) {
-                    resolve({ status: 'OFFLINE', responseTime, message: `Certificate expires in ${daysLeft}d!` });
+                    resolve({ status: 'OFFLINE', responseTime, message: `Expires in ${daysLeft}d! · ${messageBase}` });
+                } else if (daysLeft < 14) {
+                    resolve({ status: 'ONLINE', responseTime, message: `Warning: Expires in ${daysLeft}d · ${messageBase}` });
                 } else {
-                    resolve({ status: 'ONLINE', responseTime, message: `Valid · ${daysLeft}d remaining` });
+                    resolve({ status: 'ONLINE', responseTime, message: `Valid ${daysLeft}d · ${messageBase}` });
                 }
             }
         );

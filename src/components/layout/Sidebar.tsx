@@ -15,6 +15,7 @@ import {
     CalendarClock,
     BarChart2,
     Zap,
+    Monitor,
 } from "lucide-react";
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
     { name: "Incidents", href: "/dashboard/incidents", icon: Bell },
     { name: "Infrastructure", href: "/dashboard/topology", icon: FolderTree },
     { name: "3D Nerve System", href: "/dashboard/3d-map", icon: Zap },
+    { name: "TV / Kiosk Mode", href: "/tv", icon: Monitor },
     { name: "Maintenance", href: "/dashboard/maintenance", icon: CalendarClock },
     { name: "Reports", href: "/dashboard/reports", icon: BarChart2, role: "ADMIN" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },

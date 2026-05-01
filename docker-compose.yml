@@ -13,7 +13,6 @@ services:
       - DATABASE_URL=file:/app/data/pulse.db
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=generate-a-long-random-string-here
-      # Optional: Healthcheck für automatische Restarts bei Fehlern
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
