@@ -196,10 +196,9 @@ export default async function PublicStatusPage({
                                 });
 
                                 let status = "ONLINE";
-                                if (downtimeMinutes > 1430) status = "OFFLINE"; // Almost full day down
-                                else if (downtimeMinutes > 5) status = "DEGRADED"; // Some outage
+                                if (downtimeMinutes > 5) status = "OFFLINE"; // Significant outage
+                                else if (downtimeMinutes > 0) status = "PARTIAL"; // Minor outage
                                 else if (dayResults.length === 0) status = "NODATA";
-                                else if (dayResults.some(r => r.status === "OFFLINE") || downtimeMinutes > 0) status = "DEGRADED";
 
                                 return {
                                     date: date.toLocaleDateString(),
@@ -280,7 +279,7 @@ export default async function PublicStatusPage({
                                                         "flex-1 rounded-sm transition-all hover:scale-y-110 cursor-help relative group",
                                                         day.status === "ONLINE"
                                                             ? "bg-green-500/80 h-full"
-                                                            : day.status === "DEGRADED"
+                                                            : day.status === "PARTIAL"
                                                                 ? "bg-orange-500/80 h-full"
                                                                 : day.status === "OFFLINE"
                                                                     ? "bg-red-500/80 h-full"
